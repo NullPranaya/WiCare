@@ -190,13 +190,12 @@ Use `./espectre collect --label <name>` to record labeled raw-CSI clips (`fall`,
 pauses the on-device detector while recording, so it runs as a separate mode, not during the
 live demo. Perform falls onto a mattress or crash mat.
 
-## Calls made by the builder-facing author (correct if wrong)
+## Calls made during design (approved with the design)
 
 - **Bystanders:** tape off a zone of about 2–3 m around the bed and the board↔phone link, and
   add an **Armed / patient in bed** toggle on the dashboard. Alerts fire only while armed.
-- **Alert phone:** the message may go to the hotspot iPhone, but the demo script keeps that
-  phone face-up and untouched on the table. The dashboard shows the message status too. If a
-  second iPhone is available, send to it instead.
+- **Alert phone (decided by the team):** the iMessage goes to a second iPhone, the "nurse
+  iPhone", not the hotspot phone. The hotspot phone stays still on the table.
 - **Who does hardware steps:** a person does anything that needs a browser or a password.
   The agent does serial and Direct HTTP work with the team's go-ahead.
 
