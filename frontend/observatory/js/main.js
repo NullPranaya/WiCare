@@ -30,7 +30,7 @@ const C = {
   blueSignal: 0x2090ff,
   redAlert:   0xff3040,
   redHeart:   0xff4060,
-  bgDeep:     0x080c14,
+  bgDeep:     0x101a2c,   // AuraCare: lifted from 0x080c14
 };
 
 // SCENARIO_NAMES, DEFAULTS, SETTINGS_VERSION, PRESETS imported from hud-controller.js
@@ -205,11 +205,11 @@ class Observatory {
     // Reflective floor
     const floorGeo = new THREE.PlaneGeometry(12, 10);
     this._floorMat = new THREE.MeshStandardMaterial({
-      color: 0x101810,
+      color: 0x1c2e26,                                   // AuraCare: lifted from 0x101810
       roughness: 1.0 - this.settings.reflect * 0.7,
       metalness: this.settings.reflect * 0.5,
-      emissive: 0x020404,
-      emissiveIntensity: 0.08,
+      emissive: 0x0a1a14,
+      emissiveIntensity: 0.4,
     });
     const floor = new THREE.Mesh(floorGeo, this._floorMat);
     floor.rotation.x = -Math.PI / 2;

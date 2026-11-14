@@ -19,16 +19,17 @@ export const SCENARIO_NAMES = [
 ];
 
 export const DEFAULTS = {
-  bloom: 0.08, bloomRadius: 0.2, bloomThresh: 0.6,
-  exposure: 1.3, vignette: 0.25, grain: 0.01, chromatic: 0.0005,
-  boneThick: 0.018, jointSize: 0.035, glow: 0.3, trail: 0.35,
+  // AuraCare: brighter room (was bloom 0.08, exposure 1.3, vignette 0.25, glow 0.3, field 0.45, waves 0.4, ambient 0.7)
+  bloom: 0.22, bloomRadius: 0.2, bloomThresh: 0.6,
+  exposure: 1.75, vignette: 0.12, grain: 0.01, chromatic: 0.0005,
+  boneThick: 0.026, jointSize: 0.045, glow: 0.5, trail: 0.35,
   wireColor: '#00d878', jointColor: '#ff4060', aura: 0.02,
-  field: 0.45, waves: 0.4, ambient: 0.7, reflect: 0.2,
+  field: 0.6, waves: 0.55, ambient: 1.0, reflect: 0.2,
   fov: 50, orbitSpeed: 0.15, grid: true, room: true,
   scenario: 'auto', cycle: 30, dataSource: 'demo', wsUrl: '',
 };
 
-export const SETTINGS_VERSION = '6';
+export const SETTINGS_VERSION = '6-auracare2';   // bump so saved darker settings reset once
 
 export const PRESETS = {
   foundation: {},

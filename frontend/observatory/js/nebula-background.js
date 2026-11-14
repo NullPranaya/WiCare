@@ -55,21 +55,21 @@ void main() {
   float n2 = fbm(dir * 4.0 - uTime * 0.005, max(1.0, uOctaves - 1.0));
 
   // Foundation palette: deep blue-black with warm undertones
-  vec3 deepBlack  = vec3(0.03, 0.04, 0.06);
-  vec3 warmNavy   = vec3(0.04, 0.05, 0.10);
-  vec3 greenTint  = vec3(0.01, 0.06, 0.04);
+  vec3 deepBlack  = vec3(0.05, 0.07, 0.12);   // AuraCare: lifted
+  vec3 warmNavy   = vec3(0.08, 0.12, 0.24);
+  vec3 greenTint  = vec3(0.03, 0.14, 0.10);
 
   vec3 bg = mix(deepBlack, warmNavy, n1 * 0.5);
   bg = mix(bg, greenTint, n2 * 0.15);
 
   // Subtle top-down gradient (lighter ceiling)
-  float upFactor = max(0.0, dir.y) * 0.08;
+  float upFactor = max(0.0, dir.y) * 0.6;
   bg += vec3(0.02, 0.03, 0.05) * upFactor;
 
   // Very subtle dim stars (distant)
   vec3 c = floor(dir * 200.0);
   vec3 h = hash33(c);
-  float star = step(0.998, h.x) * h.y * 0.15;
+  float star = step(0.997, h.x) * h.y * 0.55;
   star *= 0.7 + 0.3 * sin(uTime * 1.5 + h.z * 80.0);
   bg += vec3(0.6, 0.7, 0.8) * star;
 

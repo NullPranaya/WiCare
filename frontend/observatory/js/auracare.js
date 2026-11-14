@@ -234,5 +234,19 @@ export class AuraCare {
     this._last[id] = v;
     const el = $(id);
     if (el) el.textContent = v;
+    if (id === 'aura-sentence' || id === 'care-status-label') this._log(id, v);
+  }
+
+  // Activity log: one line each time the sentence or the care status changes (newest first, last 40)
+  _log(id, v) {
+    const ol = $('aura-log');
+    if (!ol || !v || v === '--') return;
+    const li = document.createElement('li'), t = document.createElement('time'), x = document.createElement('span');
+    t.textContent = hhmmss(new Date()).replace(/ ?[AP]M$/i, '');
+    x.textContent = v;
+    if (id === 'care-status-label') li.dataset.tone = this.status;
+    li.append(t, x);
+    ol.prepend(li);
+    while (ol.children.length > 40) ol.lastChild.remove();
   }
 }

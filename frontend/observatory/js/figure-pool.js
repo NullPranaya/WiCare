@@ -384,7 +384,7 @@ export class FigurePool {
       if (seg.isHead) {
         const headJoint = fig.joints[seg.a];
         seg.mesh.position.set(headJoint.position.x, headJoint.position.y + 0.05, headJoint.position.z);
-        seg.mat.opacity = 0.15;
+        seg.mat.opacity = 0.34;   // AuraCare: more solid body (was 0.15)
       } else {
         const jA = fig.joints[seg.a];
         const jB = fig.joints[seg.b];
@@ -393,7 +393,7 @@ export class FigurePool {
           seg.mesh.position.copy(jA.position);
           seg.mesh.scale.set(1, 1, len);
           seg.mesh.lookAt(jB.position);
-          seg.mat.opacity = 0.12;
+          seg.mat.opacity = 0.28;
         }
       }
       seg.mat.emissiveIntensity = 0.1 + Math.abs(breathPulse) * 0.4;

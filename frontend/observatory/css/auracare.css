@@ -3,12 +3,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Instrument+Serif:ital@1&display=swap');
 
 :root {
-  --ac-panel: rgba(9, 11, 15, 0.74);
-  --ac-line: rgba(255, 255, 255, 0.10);
+  --ac-panel: rgba(17, 21, 30, 0.80);
+  --ac-line: rgba(255, 255, 255, 0.14);
   --ac-line-soft: rgba(255, 255, 255, 0.07);
   --ac-text: #f2f3f1;
   --ac-dim: rgba(242, 243, 241, 0.58);
-  --ac-ok: #3ddc97; --ac-watch: #ffb020; --ac-help: #ff8a3d;
+  --ac-ok: #3ddc97; --ac-watch: #f2b56b; --ac-help: #ff6b5e;
   --ac-ui: 'Space Grotesk', 'Avenir Next', 'Segoe UI', sans-serif;
   --ac-mono: 'JetBrains Mono', monospace;
 }
@@ -109,3 +109,37 @@ body[data-care="help"]  .ap-headline { color: var(--ac-help); }
 @media (max-width: 1000px) { #aura-chat { display: none; } .aura-panel { width: 250px; } }
 @media (prefers-reduced-motion: reduce) { #aura-vignette, .care-dot, .cs-step::before { animation: none !important; } }
 #brand, #status-bar { z-index: 3; }
+
+/* ================= columns: full-height panels with divided headers, like a console ================= */
+.aura-panel { top: 92px; bottom: 16px; width: 320px; padding: 0 16px 16px; gap: 12px; }
+#aura-chat { max-height: none; }
+.ap-title { margin: 0 -16px 4px; padding: 16px; border-bottom: 1px solid var(--ac-line); font-size: 18px; }
+.ap-block { background: rgba(255,255,255,.025); border-color: var(--ac-line); }
+.ap-grow { overflow: hidden; }
+#aura-topbar { border-color: var(--ac-line); }
+
+/* colour only where it carries meaning: the chip, the step in progress, the log line. Text stays white. */
+body[data-care="watch"] .ap-headline, body[data-care="help"] .ap-headline { color: var(--ac-text); }
+#aura-vignette { box-shadow: inset 0 0 200px 20px rgba(242,181,107,.12); }
+body[data-care="help"] #aura-vignette { box-shadow: inset 0 0 240px 40px rgba(255,107,94,.22); }
+.care-status[data-state="watch"] { background: rgba(242,181,107,.10); border-color: rgba(242,181,107,.45); }
+.care-status[data-state="help"]  { background: rgba(255,107,94,.12); border-color: rgba(255,107,94,.55); }
+
+#aura-log { list-style: none; margin: 0; padding: 0; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+#aura-log li { display: flex; gap: 10px; font-size: 13px; line-height: 1.35; color: var(--ac-dim); }
+#aura-log li:first-child { color: var(--ac-text); }
+#aura-log time { font-family: var(--ac-mono); font-size: 11px; color: var(--ac-dim); flex: none; padding-top: 1px; font-variant-numeric: tabular-nums; }
+#aura-log li[data-tone="watch"] span { color: var(--ac-watch); }
+#aura-log li[data-tone="help"] span { color: var(--ac-help); }
+#aura-log li[data-tone="ok"] span { color: var(--ac-ok); }
+@media (max-width: 1000px) { .aura-panel { width: 260px; } }
+
+/* ================= compact: panels end with their content; the two bottom blocks are fixed-size ================= */
+.aura-panel { bottom: auto; }
+.ap-grow { flex: none; height: 148px; }
+#aura-chat .ap-grow { height: min(380px, 46vh); }   /* tall enough for the whole check-in conversation on stage */
+
+/* status chip, console style: bold caps, squared, no dot */
+.care-status { padding: 7px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; }
+.care-status::before { content: 'Status:'; font-weight: 500; opacity: .75; }
+.care-dot { display: none; }
