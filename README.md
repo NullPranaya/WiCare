@@ -2,7 +2,7 @@
 
 # AuraCare
 
-### Uses Wi-Fi waves to check on patients.
+### Wi-Fi waves that watch over patients, without ever seeing them.
 
 *No cameras. No microphones. No wearables. Just radio, physics, and a text message.*
 
