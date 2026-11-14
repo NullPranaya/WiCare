@@ -161,3 +161,10 @@ def test_index_served(tmp_path):
     with TestClient(build(tmp_path, [])) as client:
         response = client.get("/")
     assert response.status_code == 200 and "FallGuard" in response.text
+
+
+def test_websocket_library_installed_for_uvicorn():
+    # uvicorn rejects WebSocket upgrades ("Unsupported upgrade request") without one of these.
+    import importlib.util
+
+    assert importlib.util.find_spec("websockets") or importlib.util.find_spec("wsproto")

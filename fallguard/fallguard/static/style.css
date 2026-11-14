@@ -1,0 +1,100 @@
+:root {
+  --ward: #E8EEF0;
+  --sheet: #F7FAFB;
+  --ink: #15232C;
+  --quiet: #5E717B;
+  --trace: #0E7A80;
+  --burst: #B9770E;
+  --fall: #C0262D;
+  --line: #CBD6DB;
+  font-family: "Atkinson Hyperlegible", system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--ward);
+  font-variant-numeric: tabular-nums;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; }
+h1, h2, p { margin: 0; }
+
+.top {
+  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+  padding: 1rem 2rem; background: var(--sheet); border-bottom: 1px solid var(--line);
+}
+.top h1 { font-size: 1.5rem; font-weight: 700; }
+.room { font-weight: 400; color: var(--quiet); margin-left: .5rem; }
+
+.steps { display: flex; gap: .25rem; list-style: none; margin: 0 auto; padding: 0; }
+.steps li {
+  padding: .4rem .9rem; border-radius: 999px; color: var(--quiet); font-size: 1rem;
+  border: 1px solid transparent;
+}
+.steps li.active { color: var(--ink); border-color: var(--ink); font-weight: 700; }
+.steps li[data-step="BURST"].active { color: var(--burst); border-color: var(--burst); }
+.steps li[data-step="STILLNESS"].active,
+.steps li[data-step="FALL"].active { color: var(--fall); border-color: var(--fall); }
+
+.arm { display: flex; align-items: center; gap: .5rem; font-size: 1.05rem; cursor: pointer; }
+.arm input { width: 1.3rem; height: 1.3rem; accent-color: var(--trace); }
+
+main { padding: 1.5rem 2rem 2rem; max-width: 1400px; margin: 0 auto; }
+
+.status { margin-bottom: 1rem; }
+.status-word { font-size: clamp(2.5rem, 6vw, 4.5rem); font-weight: 700; line-height: 1.05; }
+.status-word[data-state="BURST"] { color: var(--burst); }
+.status-word[data-state="STILLNESS"], .status-word[data-state="FALL"] { color: var(--fall); }
+.status-word[data-state="NO_SIGNAL"] { color: var(--quiet); }
+.status-note { font-size: 1.25rem; color: var(--quiet); margin-top: .35rem; min-height: 1.6em; }
+
+.trace { background: var(--sheet); border: 1px solid var(--line); border-radius: 6px; padding: 1rem 1rem .5rem; }
+#chart { display: block; width: 100%; height: clamp(220px, 38vh, 420px); }
+.axis { display: flex; justify-content: space-between; color: var(--quiet); font-size: .9rem; padding-top: .25rem; }
+
+.facts { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 2rem; margin-top: 1.5rem; }
+.fact h2 { font-size: 1rem; font-weight: 700; color: var(--quiet); margin-bottom: .5rem; }
+.fact p { font-size: 1.15rem; line-height: 1.5; }
+.ok::before { content: "✓ "; color: var(--trace); font-weight: 700; }
+.bad::before { content: "✗ "; color: var(--fall); font-weight: 700; }
+
+.boards { list-style: none; margin: 0; padding: 0; font-size: 1.1rem; line-height: 1.6; }
+.dot { display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; background: var(--fall); margin-right: .45rem; }
+.dot.on { background: var(--trace); }
+.boards .meta { color: var(--quiet); }
+
+.actions { display: flex; gap: .75rem; align-items: center; margin-top: 1.75rem; flex-wrap: wrap; }
+button {
+  font: inherit; font-size: 1.05rem; padding: .6rem 1.1rem; border-radius: 6px;
+  border: 1px solid var(--ink); background: var(--sheet); color: var(--ink); cursor: pointer;
+}
+button:hover { background: #fff; }
+:focus-visible { outline: 3px solid var(--trace); outline-offset: 2px; }
+.mark-note { color: var(--quiet); }
+
+.replay-banner, .link-banner { padding: .5rem 2rem; font-weight: 700; color: #fff; }
+.replay-banner { background: var(--quiet); }
+.link-banner { background: var(--burst); }
+
+.alarm {
+  position: fixed; inset: 0; background: var(--fall); color: #fff;
+  display: flex; align-items: center; justify-content: center; text-align: center; padding: 2rem;
+}
+.alarm[hidden] { display: none; }
+.alarm-title { font-size: clamp(4.5rem, 12vw, 9rem); font-weight: 700; line-height: 1; }
+.alarm-detail { font-size: clamp(1.4rem, 2.8vw, 2.2rem); margin-top: 1.25rem; }
+.alarm-message { font-size: 1.3rem; margin-top: .75rem; opacity: .9; }
+.ack {
+  margin-top: 2.5rem; font-size: 1.6rem; padding: .9rem 2.4rem;
+  background: #fff; color: var(--fall); border-color: #fff; font-weight: 700;
+}
+.ack:focus-visible { outline-color: #fff; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .alarm:not([hidden]) .alarm-title { animation: beat 1.2s ease-in-out infinite; }
+}
+@keyframes beat { 50% { opacity: .55; } }
+
+@media (max-width: 800px) {
+  .top, main { padding-left: 1rem; padding-right: 1rem; }
+  .steps { margin: 0; flex-wrap: wrap; }
+  .facts { grid-template-columns: 1fr; gap: 1.25rem; }
+}

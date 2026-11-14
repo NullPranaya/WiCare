@@ -39,6 +39,7 @@ class ReplaySource:
 
     async def _iterate(self) -> AsyncIterator[MotionSample | BoardStatus]:
         previous_t: float | None = None
+        board = None
         for t, board, score, device_ms in _rows(self.path):
             if previous_t is None:
                 yield BoardStatus(board, True, "replay")
@@ -46,6 +47,8 @@ class ReplaySource:
                 await self.sleep(max(t - previous_t, 0.0) / self.speed)
             previous_t = t
             yield MotionSample(board, self.clock(), score, device_ms)
+        if board is not None:
+            yield BoardStatus(board, False, "replay finished")
 
     def __call__(self) -> AsyncIterator[MotionSample | BoardStatus]:
         return self._iterate()

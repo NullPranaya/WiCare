@@ -1,1 +1,75 @@
-<!doctype html><title>FallGuard</title><p>FallGuard dashboard placeholder</p>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FallGuard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="replay-banner" class="replay-banner" hidden>Replay of a recorded session — not live</div>
+  <div id="link-banner" class="link-banner" hidden>Disconnected from the FallGuard app. Reconnecting…</div>
+
+  <header class="top">
+    <h1>FallGuard <span class="room">Bed 1</span></h1>
+    <ol class="steps" aria-label="Fall rule progress">
+      <li data-step="MONITORING">Monitoring</li>
+      <li data-step="BURST">Sudden movement</li>
+      <li data-step="STILLNESS">Stillness</li>
+      <li data-step="FALL">Possible fall</li>
+    </ol>
+    <label class="arm">
+      <input id="armed" type="checkbox" checked>
+      <span>Patient in bed</span>
+    </label>
+  </header>
+
+  <main>
+    <section class="status" aria-live="polite">
+      <p id="status-word" class="status-word">Connecting…</p>
+      <p id="status-note" class="status-note"></p>
+    </section>
+
+    <section class="trace" aria-label="Movement over the last 60 seconds">
+      <canvas id="chart"></canvas>
+      <p class="axis"><span>60 s ago</span><span>now</span></p>
+    </section>
+
+    <section class="facts">
+      <div class="fact">
+        <h2>Why it alerts</h2>
+        <p id="rule-burst">Sudden movement: waiting</p>
+        <p id="rule-still">Stillness after it: waiting</p>
+      </div>
+      <div class="fact">
+        <h2>Nurse iPhone</h2>
+        <p id="alert-text">No alerts sent yet</p>
+      </div>
+      <div class="fact">
+        <h2>Wi-Fi sensors</h2>
+        <ul id="boards" class="boards"></ul>
+      </div>
+    </section>
+
+    <section class="actions">
+      <button id="mark-fall" type="button">That was a fall</button>
+      <button id="mark-false" type="button">That was a false alarm</button>
+      <span id="mark-note" class="mark-note" aria-live="polite"></span>
+    </section>
+  </main>
+
+  <div id="alarm" class="alarm" hidden role="alertdialog" aria-labelledby="alarm-title">
+    <div class="alarm-body">
+      <p id="alarm-title" class="alarm-title">Possible fall</p>
+      <p id="alarm-detail" class="alarm-detail"></p>
+      <p id="alarm-message" class="alarm-message"></p>
+      <button id="ack" type="button" class="ack">Acknowledge</button>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
