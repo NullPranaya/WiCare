@@ -12,7 +12,7 @@
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-random%20forest-F7931E?logo=scikitlearn&logoColor=white)
 ![ESP32](https://img.shields.io/badge/ESP32-CSI%20sensing-E7352C?logo=espressif&logoColor=white)
 ![iMessage](https://img.shields.io/badge/Photon-iMessage-34C759?logo=apple&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-24%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-30%20passing-brightgreen)
 ![Paid APIs](https://img.shields.io/badge/paid%20APIs-0-blue)
 
 **HackPrinceton Fall 2026**
@@ -29,12 +29,26 @@ frequencies inside the signal.
 the signal into a live movement score, and a set of temporal rules watches for one specific pattern: **a burst of
 movement followed by stillness.** When it sees that, AuraCare doesn't sound an alarm. It asks:
 
-> **AuraCare check-in (test):** we noticed an unusual movement pattern. Are you OK?
-> Reply 1 = OK, 2 = HELP, 3 = AWAY
+> 💙 **AuraCare | Wellbeing Check**
+>
+> Hi! We noticed some unusual movement in your room and wanted to check on you.
+>
+> Are you okay?
+>
+> Reply 1: YES
+> Reply 2: NO
 
-Reply "OK" and the check-in closes. Ask for help, or stay silent, and the caregiver's phone lights up with the
-event and the evidence behind it. The caregiver can text back *"why did this alert?"* and get an answer built
-only from recorded sensor data, with the IDs of the measurements it used.
+At the same moment, the patient's nurse gets a calm heads-up, so the care team is never out of the loop:
+
+> 🩺 **AuraCare | Care Team Notice**
+>
+> We noticed unusual movement in your patient's room and just sent them a wellbeing check.
+> No action needed yet. We'll update you as soon as they reply.
+
+Then the nurse hears how it ended, whatever happens: *"Good news: your patient replied YES"*, *"Your patient
+replied NO and may need help. Please go check on them now."*, or *"Your patient hasn't answered yet."* The patient
+gets a warm thank-you either way. The nurse can text back *"why did this alert?"* and get an answer built only
+from recorded sensor data, with the IDs of the measurements it used.
 
 > [!NOTE]
 > AuraCare is a research prototype, tested only with consenting teammates and fictional patients. It is not a
@@ -72,7 +86,7 @@ only from recorded sensor data, with the IDs of the measurements it used.
    ┌───────────┐   ┌────────────────┐   ┌──────────────────┐   ┌───────────────┐   ┌────────┐
    │ iMessage  │<──│ check-in state │<──│ policy: opt-in,  │<──│ burst then 8s │<──│ P(move)│
    │ patient + │   │ machine (15 s) │   │ sensor fresh, no │   │ stillness rule│   │ 1 Hz   │
-   │ caregiver │   └────────────────┘   │ open check-in    │   └───────────────┘   └────────┘
+   │ + nurse   │   └────────────────┘   │ open check-in    │   └───────────────┘   └────────┘
    └───────────┘                        └──────────────────┘
 ```
 
@@ -110,7 +124,7 @@ flowchart LR
     subgraph MSG["Messaging"]
         C <--> PH[Photon 2.0<br/>REST + signed webhooks]
         PH <--> PT[Patient]
-        PH <--> CG[Caregiver]
+        PH <--> CG[Nurse]
     end
 ```
 
@@ -120,16 +134,22 @@ sequenceDiagram
     participant R as Room
     participant A as AuraCare
     participant P as Patient
-    participant C as Caregiver
+    participant C as Nurse
     R->>A: CSI stream, both nodes
     A->>A: movement score every second
     Note over A: score >= 0.8, then <= 0.4 for 8 s
-    A->>P: Are you OK? 1 = OK, 2 = HELP, 3 = AWAY
-    alt replies OK
-        P->>A: OK
-        A->>A: closed: acknowledged
-    else HELP, help words, or 15 s of silence
-        A->>C: alert + event ID
+    par at the same moment
+        A->>P: Wellbeing Check: are you okay? 1 YES, 2 NO
+    and
+        A->>C: Care Team Notice: check sent, no action yet
+    end
+    alt replies YES
+        P->>A: 1 / yes / I'm okay
+        A->>C: Update: patient replied YES, no action needed
+        A->>P: Thank you! Glad you're okay
+    else NO, help words, or 15 s of silence
+        A->>C: Please check in now + event ID
+        A-->>P: We've let your nurse know right away
         C->>A: why did this alert?
         A->>C: evidence summary + cited observation IDs
     end
@@ -202,16 +222,18 @@ that the sensor is fresh, the participant opted in, the event source is allowed,
 
 | Patient reply | Outcome |
 |---|---|
-| `OK` / `1` | closed as *acknowledged* (an acknowledgment, not proof of safety) |
-| `HELP` / `2`, or "fell", "hurt", "can't get up", "dizzy"... | caregiver alerted |
-| `AWAY` / `3` | closed as *away* |
-| anything else | *ambiguous*: caregiver asked to review, check-in stays open |
-| no reply in 15 s | caregiver alerted |
-| message undeliverable | caregiver alerted |
+| `1`, `yes`, `ok`, `I'm okay`... | closed as *acknowledged* (not proof of safety); nurse told "no action needed"; patient thanked |
+| `2`, `no`, `help`, or "fell", "hurt", "can't get up", "dizzy"... | nurse asked to check in now; patient told the nurse knows |
+| `away` / `3` (understood, not advertised) | closed as *away*; nurse updated |
+| anything else | *ambiguous*: patient asked again, nurse asked to review, check-in stays open |
+| no reply in 15 s | nurse asked to check in |
+| message undeliverable | nurse asked to check in directly |
+
+The nurse is told the moment the patient is texted, so a check-in never happens behind the care team's back.
 
 ### 3.7 The evidence investigator
 Every event gets a report assembled only from stored numbers: sensor health, activity 30 s before and after,
-signal coverage, the check-in timeline. Every sentence cites the observation IDs it came from. Caregiver
+signal coverage, the check-in timeline. Every sentence cites the observation IDs it came from. Nurse
 questions are routed by keyword to the right part of that report. **There is no language model anywhere in the
 loop, so there is nothing to hallucinate.**
 
@@ -264,7 +286,7 @@ People counting at 0.64 is too weak to act on, so it is never allowed to cancel 
 
 ## 5. Fail-safe by design
 
-24 automated tests, one or more per rule:
+30 automated tests, one or more per rule:
 
 | Guarantee | Tests |
 |---|---|
@@ -274,12 +296,12 @@ People counting at 0.64 is too weak to act on, so it is never allowed to cancel 
 | OK acknowledges; help words escalate; free text never closes a check-in | `test_ok_*`, `test_help_*`, `test_mixed_*`, `test_ambiguous_never_closes` |
 | Timeouts and delivery failures escalate | `test_timeout_escalates`, `test_delivery_failure_recorded` |
 | Webhooks need a valid, fresh signature; rotation works; own messages ignored | `test_unknown_sender_and_bad_signature`, `test_signature_rotation_and_stale_timestamp`, `test_own_agent_message_ignored` |
-| Reports cite only real IDs; caregiver answers are grounded; replays are labelled | `test_report_*`, `test_stale_sensor_report_*`, `test_caregiver_question_gets_grounded_answer`, `test_replay_labelled` |
+| Reports cite only real IDs; nurse answers are grounded; replays are labelled | `test_report_*`, `test_stale_sensor_report_*`, `test_caregiver_question_gets_grounded_answer`, `test_replay_labelled` |
 | Activity labels attach to events only after live validation | `test_ml_only_attached_after_validation` |
 | Windows follow the real packet rate; layout check survives the zeroed subcarrier | `test_window_*`, `test_lag2_*` |
 
-**Privacy:** no video, no audio, no MAC addresses, phone numbers only in a local `.env`, every message labelled
-as a test, consenting teammates only.
+**Privacy:** no video, no audio, no MAC addresses, phone numbers only in a local `.env`, roles (patient / nurse)
+instead of numbers everywhere else, consenting teammates only.
 
 ## 6. Tech stack
 
@@ -292,10 +314,10 @@ as a test, consenting teammates only.
 | Machine learning | scikit-learn (random forest), PyTorch (1D CNN) | room movement score; WiFall benchmark ensemble |
 | Uncertainty | split conformal prediction | calibrated prediction sets and abstention |
 | Backend | FastAPI, Uvicorn, SQLite | ingestion, rules, policy, check-ins, evidence store |
-| Reasoning | deterministic investigator + keyword reply parser | grounded caregiver answers, no LLM |
+| Reasoning | deterministic investigator + keyword reply parser | grounded nurse answers, no LLM |
 | Messaging | Photon 2.0 REST API, Standard Webhooks | iMessage check-ins and replies |
 | Networking | Cloudflare Tunnel | public HTTPS for webhooks |
-| Testing | pytest | 24 safety and correctness tests |
+| Testing | pytest | 30 safety and correctness tests |
 
 ## 7. Quickstart
 
@@ -316,7 +338,7 @@ pytest -q
 | `PARTICIPANT_OPT_IN` | must be `1` before anyone is messaged |
 | `DEMO_MODE` | `1` lets replayed or synthetic events text test numbers |
 | `EXPECTED_ACTIVE` | `0` for the demo: a quiet room alone never triggers a text |
-| `CHECKIN_TIMEOUT_S` | seconds before silence escalates to the caregiver (demo: 15) |
+| `CHECKIN_TIMEOUT_S` | seconds before silence escalates to the nurse (demo: 15) |
 | `PHOTON_MODE` | `mock` logs messages, `api` sends them |
 | `PHOTON_PROJECT_ID`, `PHOTON_PROJECT_API_KEY` | from the Photon dashboard |
 | `PHOTON_WEBHOOK_SECRET` | the `whsec_...` secret from the webhook destination |
@@ -385,12 +407,12 @@ backend/         FastAPI app, settings, SQLite store, service layer
 monitoring/      csi_worker (live / replay / synthetic), temporal rules, policy, calibration
 sensors/         subcarrier mapping, layout checks, timestamp windowing, sensor health
 ml/              WiFall pipeline (RF, CNN, conformal), room dataset loader, room movement model, evaluations
-investigation/   evidence investigator and grounded caregiver answers
+investigation/   evidence investigator and grounded nurse answers
 photon/          Photon 2.0 client, webhook verification, check-in state machine, reply parser
 models/          room movement model, calibration, conformal threshold
 evaluation/      saved metrics behind every number above
 sim/             WiFall replay sensor
-tests/           24 tests
+tests/           30 tests
 ```
 
 ## 11. Limitations and roadmap
@@ -406,7 +428,7 @@ tests/           24 tests
 - multi-day recordings, furniture changes, more rooms
 - per-person routines instead of fixed thresholds
 - presence and people-count from the hub as investigator context
-- a caregiver dashboard over the event and check-in timeline
+- a nurse dashboard across multiple rooms and patients
 
 ## 12. Credits
 

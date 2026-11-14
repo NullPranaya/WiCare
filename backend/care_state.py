@@ -10,13 +10,13 @@ HOLD_HELP_S = 120      # keep an escalated check-in on screen this long
 
 # check-in state -> (ui status, pill label, strip title, step, per-step reply text)
 STATES = {
-    'pending':         ('watch', 'Check-in sent',     'Unusual movement · waiting for reply',   2, 'Reply'),
-    'ambiguous':       ('watch', 'Unclear reply',     'Unclear reply · caregiver reviewing',    4, 'Reply: unclear'),
-    'acknowledged':    ('ok',    'Patient OK',        'Patient replied OK',                     3, 'Reply: OK'),
-    'away':            ('ok',    'Patient away',      'Patient reports being away',             3, 'Reply: AWAY'),
-    'help_requested':  ('help',  'Help requested',    'Help requested · caregiver notified',    4, 'Reply: HELP'),
-    'timeout':         ('help',  'No reply',          'No reply · caregiver notified',          4, 'No reply'),
-    'delivery_failed': ('help',  'Message failed',    'Check-in failed · caregiver notified',   4, 'Not delivered'),
+    'pending':         ('watch', 'Check-in sent',  'Wellbeing check sent · nurse notified',  2, 'Reply'),
+    'ambiguous':       ('watch', 'Unclear reply',  'Unclear reply · nurse reviewing',        4, 'Reply: unclear'),
+    'acknowledged':    ('ok',    'Patient OK',     'Patient replied YES · nurse updated',    4, 'Reply: YES'),
+    'away':            ('ok',    'Patient away',   'Patient is away · nurse updated',        4, 'Reply: AWAY'),
+    'help_requested':  ('help',  'Needs help',     'Patient replied NO · nurse alerted',     4, 'Reply: NO'),
+    'timeout':         ('help',  'No reply',       'No reply · nurse alerted',               4, 'No reply'),
+    'delivery_failed': ('help',  'Not delivered',  'Check-in not delivered · nurse alerted', 4, 'Not delivered'),
 }
 
 def _active_checkin(db):

@@ -12,10 +12,13 @@ def test_abrupt_then_still_creates_one_checkin_and_one_message(svc):
     assert ev['review_status'] == 'unconfirmed'
     assert len(ev['evidence_ids']) > 5 and all(i.startswith('obs_') for i in ev['evidence_ids'])
     assert [m['status'] for m in msgs(svc, 'patient')] == ['mock_sent']
+    nurse = msgs(svc, 'caregiver')                                  # nurse hears at the same time, reply or not
+    assert len(nurse) == 1 and 'Care Team Notice' in nurse[0]['text'] and ev['id'] in nurse[0]['text']
+    assert ev['review_status'] == 'unconfirmed'                     # a heads-up is not an escalation
     # same pattern again while check-in is open: evidence updates, no new message
     ev2 = feed_fall_like(svc, t0=1_000_100.0)
     assert ev2['policy']['action'] == 'update_existing'
-    assert len(msgs(svc, 'patient')) == 1
+    assert len(msgs(svc, 'patient')) == 1 and len(msgs(svc, 'caregiver')) == 1
 
 def test_stale_sensor_is_unavailable_not_inactivity(svc):
     svc.observe('esp32_01', 0.3)
@@ -59,7 +62,8 @@ def test_timeout_escalates(svc):
     svc.db.x('UPDATE checkins SET deadline = 0')
     assert checkins.sweep_timeouts(svc.db, svc.photon) == 1
     assert checkins.get(svc.db, ev['checkin_id'])['state'] == 'timeout'
-    assert len(msgs(svc, 'caregiver')) == 1
+    nurse = [m['text'] for m in msgs(svc, 'caregiver')]
+    assert len(nurse) == 2 and 'No Reply' in nurse[1]                # notice, then the timeout alert
     assert checkins.sweep_timeouts(svc.db, svc.photon) == 0       # not repeated
 
 def test_ml_only_attached_after_validation(svc):
@@ -79,7 +83,7 @@ def test_care_state_follows_checkin(svc):
     ev = feed_fall_like(svc)
     s = care_state.snapshot(svc)
     assert s['event']['id'] == ev['id'] and s['step'] == 2 and s['status'] == 'watch'
-    assert [m['role'] for m in s['messages']] == ['patient'] and '+1' not in str(s)     # roles only, no numbers
+    assert [m['role'] for m in s['messages']] == ['patient', 'caregiver'] and '+1' not in str(s)  # roles only
     svc.db.x("UPDATE checkins SET state='timeout'")
     s = care_state.snapshot(svc)
     assert s['status'] == 'help' and s['step'] == 4

@@ -3,11 +3,14 @@ signature = base64(HMAC_SHA256(base64decode(secret without 'whsec_'), f'{id}.{ti
 header 'webhook-signature' = space-separated 'v1,<b64>' entries, 5 min timestamp tolerance."""
 import base64, hashlib, hmac, time
 
-EXACT = {'ok': 'acknowledged', '1': 'acknowledged', 'help': 'help_requested', '2': 'help_requested',
-         'away': 'away', '3': 'away'}
+# exact replies to "Reply 1: YES / Reply 2: NO" (AWAY / 3 still understood, not advertised)
+EXACT = {**dict.fromkeys(['1', 'yes', 'y', 'yeah', 'yep', 'ok', 'okay', "i'm okay", 'im okay', "i'm ok", 'im ok',
+                          "i'm fine", 'im fine', 'fine'], 'acknowledged'),
+         **dict.fromkeys(['2', 'no', 'n', 'nope', 'help'], 'help_requested'),
+         **dict.fromkeys(['3', 'away'], 'away')}
 
 def exact_intent(text):
-    return EXACT.get(text.strip().strip('.!').lower())
+    return EXACT.get(text.strip().strip('.!').lower().replace('\u2019', "'"))
 
 def verify(headers, raw: bytes, secret, tolerance=300):
     wid, ts, sigs = headers.get('webhook-id'), headers.get('webhook-timestamp'), headers.get('webhook-signature')

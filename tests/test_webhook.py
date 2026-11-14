@@ -38,7 +38,10 @@ def test_help_notifies_caregiver(client, svc):
     ev = feed_fall_like(svc)
     post(client, payload('m1', '+15550000001', '2'))
     assert state(svc, ev) == 'help_requested'
-    assert svc.db.one('SELECT count(*) n FROM messages WHERE role="caregiver" AND direction="out"')['n'] == 1
+    nurse = [m['text'] for m in svc.db.q('SELECT text FROM messages WHERE role="caregiver" AND direction="out" ORDER BY created_ts')]
+    assert len(nurse) == 2 and 'Care Team Notice' in nurse[0] and 'replied NO' in nurse[1]
+    pat = [m['text'] for m in svc.db.q('SELECT text FROM messages WHERE role="patient" AND direction="out" ORDER BY created_ts')]
+    assert 'Wellbeing Check' in pat[0] and 'nurse know right away' in pat[1]
 
 def test_mixed_reply_with_help_signal_escalates(client, svc):
     ev = feed_fall_like(svc)
@@ -57,7 +60,7 @@ def test_duplicate_webhook_ignored(client, svc):
     feed_fall_like(svc)
     post(client, payload('m1', '+15550000001', '2'))
     assert post(client, payload('m1', '+15550000001', '2')).json() == {'duplicate': True}
-    assert svc.db.one('SELECT count(*) n FROM messages WHERE role="caregiver" AND direction="out"')['n'] == 1
+    assert svc.db.one('SELECT count(*) n FROM messages WHERE role="caregiver" AND direction="out"')['n'] == 2  # notice + help, once
 
 def test_unknown_sender_and_bad_signature(client, svc):
     feed_fall_like(svc)
@@ -88,3 +91,12 @@ def test_photon_idempotency_header_is_valid_and_stable():
     k = 'checkin:chk_1:caregiver:No reply to the check-in before the deadline.'
     h = idem_header(k)
     assert re.fullmatch(r'[\x21-\x7e]{1,255}', h) and h == idem_header(k) and h != idem_header(k + 'x')
+
+@pytest.mark.parametrize('reply,intent,nurse_word', [('1', 'acknowledged', 'replied YES'), ('Yes', 'acknowledged', 'replied YES'),
+                                                      ("I\u2019m okay", 'acknowledged', 'replied YES'), ('no', 'help_requested', 'replied NO')])
+def test_yes_no_replies_update_nurse_and_thank_patient(client, svc, reply, intent, nurse_word):
+    ev = feed_fall_like(svc)
+    assert post(client, payload('m1', '+15550000001', reply)).json()['interpretation']['intent'] == intent
+    nurse = [m['text'] for m in svc.db.q('SELECT text FROM messages WHERE role="caregiver" AND direction="out" ORDER BY created_ts')]
+    assert len(nurse) == 2 and nurse_word in nurse[1] and ev['id'] in nurse[1]
+    assert svc.db.one('SELECT count(*) n FROM messages WHERE role="patient" AND direction="out"')['n'] == 2   # check + thanks

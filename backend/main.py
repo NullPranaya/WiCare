@@ -124,7 +124,7 @@ async def photon_webhook(request: Request):
             return dict(ignored='no open check-in')
         svc.db.x('UPDATE messages SET checkin_id=?, event_id=? WHERE platform_id=?', (c['id'], c['event_id'], msg['message_id']))
         r = reply_parser.interpret(msg['text'])
-        return dict(interpretation=r, checkin=checkins.apply_reply(svc.db, svc.photon, checkins.get(svc.db, c['id']), r['intent'], msg['text']))
+        return dict(interpretation=r, checkin=checkins.apply_reply(svc.db, svc.photon, checkins.get(svc.db, c['id']), r['intent'], msg['text'], r['source']))
     # caregiver question -> grounded answer about the latest event with a check-in
     latest = svc.db.one('SELECT id FROM events WHERE checkin_id IS NOT NULL ORDER BY created_ts DESC LIMIT 1')
     if not latest:
