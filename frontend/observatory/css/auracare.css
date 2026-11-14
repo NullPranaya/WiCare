@@ -1,176 +1,111 @@
-/* AuraCare layer on top of RuView's observatory look (MIT, see RUVIEW_LICENSE).
-   Goal: same scene, fewer things on screen. Two small cards, one status pill, one event strip. */
+/* AuraCare layer on RuView's observatory scene (MIT, see RUVIEW_LICENSE).
+   Layout: one top bar, a Room panel on the left, a Check-in panel on the right, the scene clear in the middle. */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Instrument+Serif:ital@1&display=swap');
 
-/* ---- removed from the RuView HUD ---- */
-.aura-hide,
-#scenario-area, #scenario-description,
-#capabilities-bar, #key-hints, #edge-modules-bar,
-#fall-alert { display: none !important; }
-
-/* ---- small corner cards instead of mid-height panels ---- */
-#panel-vitals, #panel-signal {
-  top: auto;
-  bottom: 28px;
-  transform: none;
-  width: 184px;
-  padding: 12px 14px;
+:root {
+  --ac-panel: rgba(9, 11, 15, 0.74);
+  --ac-line: rgba(255, 255, 255, 0.10);
+  --ac-line-soft: rgba(255, 255, 255, 0.07);
+  --ac-text: #f2f3f1;
+  --ac-dim: rgba(242, 243, 241, 0.58);
+  --ac-ok: #3ddc97; --ac-watch: #ffb020; --ac-help: #ff8a3d;
+  --ac-ui: 'Space Grotesk', 'Avenir Next', 'Segoe UI', sans-serif;
+  --ac-mono: 'JetBrains Mono', monospace;
 }
-#panel-vitals { left: 28px; }
-#panel-signal { right: 28px; }
-#panel-vitals .vital-row { margin-bottom: 0; }
-#panel-vitals .vital-icon { display: none; }
-#panel-signal .signal-row { margin-bottom: 6px; }
-#rssi-sparkline { width: 100%; height: 32px; margin-top: 4px; opacity: 0.8; }
-#presence-indicator { margin-top: 8px; padding: 4px; font-size: 11px; letter-spacing: 1.5px; }
 
-/* ---- care status pill (top right, before the data-source badge) ---- */
-.care-status {
-  display: flex; align-items: center; gap: 8px;
-  padding: 5px 12px; border-radius: 20px;
-  font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
-  color: var(--green-glow); background: rgba(0, 216, 120, 0.08); border: 1px solid rgba(0, 216, 120, 0.25);
-  transition: color .6s ease, background .6s ease, border-color .6s ease;
-}
-.care-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.care-status[data-state="watch"] { color: var(--amber); background: rgba(255,176,32,.08); border-color: rgba(255,176,32,.35); }
-.care-status[data-state="help"]  { color: #ff8a3d;     background: rgba(255,138,61,.10); border-color: rgba(255,138,61,.45); }
-.care-status[data-state="off"]   { color: var(--text-secondary); background: rgba(232,236,224,.04); border-color: rgba(232,236,224,.2); }
-.care-status[data-state="watch"] .care-dot,
-.care-status[data-state="help"] .care-dot { animation: care-pulse 1.6s ease-in-out infinite; }
-@keyframes care-pulse { 50% { opacity: .25; } }
+/* ---- RuView HUD pieces we don't use ---- */
+.aura-hide, #scenario-area, #scenario-description, #capabilities-bar, #key-hints, #edge-modules-bar,
+#fall-alert, #panel-vitals, #panel-signal { display: none !important; }
 
-/* ---- event strip (bottom centre, only during an event) ---- */
-#care-strip {
-  position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%);
-  display: flex; align-items: center; gap: 14px;
-  padding: 10px 16px; border-radius: 12px;
-  background: var(--bg-panel); border: 1px solid rgba(255,176,32,.35);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 1px; color: var(--text-primary);
-  pointer-events: auto; white-space: nowrap;
-}
-#care-strip[hidden] { display: none; }
-#care-strip .cs-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); animation: care-pulse 1.6s ease-in-out infinite; }
-#care-strip-title { color: var(--amber); text-transform: uppercase; }
-.cs-steps { display: flex; gap: 6px; }
-.cs-step { padding: 3px 8px; border-radius: 6px; color: var(--text-label); border: 1px solid rgba(232,236,224,.12); }
-.cs-step[data-s="done"] { color: var(--text-primary); border-color: rgba(232,236,224,.3); }
-.cs-step[data-s="now"]  { color: var(--amber); border-color: rgba(255,176,32,.5); }
-.cs-step[data-s="help"] { color: #ff8a3d; border-color: rgba(255,138,61,.6); }
-#care-strip-time { color: var(--text-secondary); }
-
-@media (max-width: 900px) {
-  #care-strip { bottom: 16px; font-size: 10px; gap: 8px; }
-  .cs-steps { display: none; }
-}
-#panel-vitals .vital-label { display: none; }
-
-/* ---- live backend panels (AuraCare /care/state) ---- */
-#aura-motion[hidden], #aura-chat[hidden] { display: none; }
-#aura-motion .panel-header, #aura-chat .panel-header { display: flex; justify-content: space-between; align-items: center; }
-.aura-live { display: inline-flex; align-items: center; gap: 6px; color: var(--green-glow); letter-spacing: 1.5px; }
-.aura-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green-glow); animation: care-pulse 1.6s ease-in-out infinite; }
-
-#aura-motion { left: 28px; bottom: 28px; width: 260px; padding: 14px 16px; }
-.aura-motion-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
-.aura-score { font-family: 'JetBrains Mono', monospace; font-size: 30px; font-weight: 600; color: var(--text-primary); }
-.aura-motion-state { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 1.5px; padding: 3px 8px;
-  border-radius: 6px; border: 1px solid rgba(232,236,224,.2); color: var(--text-secondary); }
-.aura-motion-state[data-s="moving"] { color: var(--amber); border-color: rgba(255,176,32,.5); }
-.aura-motion-state[data-s="still"]  { color: var(--blue-signal); border-color: rgba(32,144,255,.45); }
-#aura-spark { width: 100%; height: 56px; display: block; }
-.aura-motion-foot { display: flex; justify-content: space-between; margin-top: 6px;
-  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1px; color: var(--text-label); }
-
-#aura-chat { right: 28px; top: 50%; transform: translateY(-50%); width: 300px; max-height: 58vh;
-  display: flex; flex-direction: column; padding: 14px 14px 10px; }
-#aura-chat-meta { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--amber); letter-spacing: 1px; }
-#aura-chat-body { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 2px; }
-.aura-empty { font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
-.aura-msg { max-width: 88%; display: flex; flex-direction: column; gap: 3px; animation: aura-in .35s ease-out; }
-.aura-msg.out { align-self: flex-end; align-items: flex-end; }
-.aura-msg.in  { align-self: flex-start; align-items: flex-start; }
-.aura-who { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-label); }
-.aura-bubble { font-size: 12.5px; line-height: 1.4; padding: 8px 11px; border-radius: 14px; white-space: pre-line; color: #fff; }
-.aura-msg.out .aura-bubble { background: #0a84ff; border-bottom-right-radius: 4px; }
-.aura-msg.out.caregiver .aura-bubble { background: #0f766e; }
-.aura-msg.in .aura-bubble { background: rgba(232,236,224,.14); color: var(--text-primary); border-bottom-left-radius: 4px; }
-.aura-msg.failed .aura-bubble { background: rgba(255,48,64,.25); border: 1px solid rgba(255,48,64,.6); }
-.aura-status { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1px; color: var(--text-label); }
-@keyframes aura-in { from { opacity: 0; } to { opacity: 1; } }
-
-/* in live mode the simulated RuView cards are hidden: nothing on screen is invented */
-body.aura-backend #panel-vitals, body.aura-backend #panel-signal { display: none !important; }
-@media (max-width: 900px) { #aura-chat { display: none; } #aura-motion { width: 200px; left: 16px; bottom: 76px; } }
-.cs-step[data-s="ok"] { color: var(--green-glow); border-color: rgba(0,216,120,.55); }
-#care-strip[data-state="ok"]   { border-color: rgba(0,216,120,.4); }
-#care-strip[data-state="ok"] .cs-dot { background: var(--green-glow); animation: none; }
-#care-strip[data-state="ok"] #care-strip-title { color: var(--green-glow); }
-#care-strip[data-state="help"] { border-color: rgba(255,138,61,.55); }
-#care-strip[data-state="help"] .cs-dot { background: #ff8a3d; }
-#care-strip[data-state="help"] #care-strip-title { color: #ff8a3d; }
-
-/* ================= v2: instruments instead of cards ================= */
-#panel-vitals, #panel-signal { display: none !important; }      /* replaced by the breath ring and room trail */
-body.aura-backend .aura-sim { display: none; }                  /* simulated-data instruments never show beside real data */
-
-/* the room itself reacts: a soft edge glow, and the scene greys out when the sensor can't see */
+/* ---- the room reacts: edge glow on an event, grey when the sensor can't see ---- */
 #aura-vignette { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1.2s ease;
-  box-shadow: inset 0 0 220px 40px rgba(255,176,32,.22); }
+  box-shadow: inset 0 0 220px 40px rgba(255,176,32,.20); }
 body[data-care="watch"] #aura-vignette { opacity: 1; animation: aura-breathe 3.2s ease-in-out infinite; }
-body[data-care="help"]  #aura-vignette { opacity: 1; box-shadow: inset 0 0 260px 60px rgba(255,120,50,.32); animation: aura-breathe 2s ease-in-out infinite; }
+body[data-care="help"]  #aura-vignette { opacity: 1; box-shadow: inset 0 0 260px 60px rgba(255,120,50,.30); animation: aura-breathe 2s ease-in-out infinite; }
 @keyframes aura-breathe { 50% { opacity: .45; } }
+@keyframes care-pulse { 50% { opacity: .3; } }
 #observatory-canvas { transition: filter 1.5s ease; }
 body[data-care="off"] #observatory-canvas { filter: grayscale(1) brightness(.55); }
 
-/* breath ring, bottom left */
-#aura-breath { position: absolute; left: 36px; bottom: 30px; width: 148px; height: 148px; }
-#aura-breath-c { width: 100%; height: 100%; display: block; }
-.ab-mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
-#aura-bpm { font-family: 'Inter', sans-serif; font-weight: 300; font-size: 38px; line-height: 1; color: var(--text-primary); font-variant-numeric: tabular-nums; }
-.ab-unit, .ab-io, .ar-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-secondary); }
-.ab-io { height: 10px; color: var(--green-glow); }
+/* ---- top bar ---- */
+#aura-topbar { position: absolute; top: 16px; left: 16px; right: 16px; height: 60px; border-radius: 14px;
+  background: var(--ac-panel); border: 1px solid var(--ac-line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+#brand { top: 16px; left: 40px; height: 60px; display: flex; align-items: center; }
+#brand-logo { font-family: var(--ac-ui); font-size: 30px; letter-spacing: -1px; line-height: 1; color: var(--ac-text); text-shadow: none; }
+#brand-logo b { font-weight: 700; }
+#brand-logo i { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; font-size: 34px; letter-spacing: -.5px; margin-left: 1px; color: var(--ac-dim); }
 
-/* room trail, bottom right */
-#aura-room { position: absolute; right: 36px; bottom: 30px; width: 204px; }
-#aura-room-c { width: 204px; height: 132px; display: block; }
-.ar-label { margin-top: 8px; text-align: right; }
-
-/* one plain sentence, bottom centre; the event strip sits above it */
-#aura-now { position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); text-align: center; white-space: nowrap;
-  font-family: 'Inter', sans-serif; font-weight: 300; font-size: 21px; letter-spacing: .2px; color: var(--text-primary);
-  text-shadow: 0 0 24px rgba(8,12,20,.9); transition: color .8s ease; }
-body[data-care="watch"] #aura-now { color: var(--amber); }
-body[data-care="help"]  #aura-now { color: #ff8a3d; }
-body[data-care="off"]   #aura-now { color: var(--text-secondary); }
-#care-strip { bottom: 78px; background: rgba(8,16,28,.55); }
-
-/* backend panels lose their boxes too */
-#aura-motion, #aura-chat { background: none; border: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
-#aura-motion { left: 36px; bottom: 30px; width: 270px; padding: 0; }
-#aura-motion .panel-header, #aura-chat .panel-header { border: none; padding-bottom: 0; margin-bottom: 6px; }
-.aura-score { font-family: 'Inter', sans-serif; font-weight: 300; font-size: 38px; }
-.aura-motion-state { border: none; padding: 0; }
-#aura-spark { height: 64px; }
-#aura-chat { padding: 0; right: 36px; }
-.aura-bubble { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-
-@media (max-width: 900px) { #aura-room { display: none; } #aura-now { font-size: 16px; bottom: 190px; } #care-strip { bottom: 230px; } }
-@media (prefers-reduced-motion: reduce) { #aura-vignette { animation: none !important; } }
-
-/* ================= v3: one quiet top line, same margins and type as the instruments ================= */
-#brand { top: 30px; left: 36px; }
-#brand-logo { display: flex; align-items: center; gap: 12px; font-weight: 300; font-size: 24px; letter-spacing: .3px; text-shadow: none; }
-.aura-mark { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--green-glow);
-  box-shadow: 0 0 0 4px rgba(0,216,120,.12); transition: border-color .8s ease, box-shadow .8s ease; }
-body[data-care="watch"] .aura-mark { border-color: var(--amber); box-shadow: 0 0 0 4px rgba(255,176,32,.16); animation: care-pulse 1.6s ease-in-out infinite; }
-body[data-care="help"]  .aura-mark { border-color: #ff8a3d; box-shadow: 0 0 0 4px rgba(255,138,61,.2); animation: care-pulse 1s ease-in-out infinite; }
-body[data-care="off"]   .aura-mark { border-color: var(--text-secondary); box-shadow: none; }
-#brand-tagline { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1.5px; margin: 6px 0 0 23px; }
-
-#status-bar { top: 30px; right: 36px; gap: 18px; }
-.care-status, .care-status[data-state] { background: none; border: none; padding: 0; font-size: 10px; letter-spacing: 1.5px; }
-#data-source-badge { background: none; border: none; padding: 0; font-size: 9px; letter-spacing: 1.5px; color: var(--text-secondary); }
-#data-source-badge .dot { width: 5px; height: 5px; }
-#settings-btn { background: none; border: none; width: 24px; height: 24px; font-size: 15px; opacity: .55; }
+#status-bar { top: 16px; right: 36px; height: 60px; gap: 16px; font-family: var(--ac-ui); }
+.care-status { order: 1; display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 8px;
+  font-family: var(--ac-ui); font-size: 13px; font-weight: 500; letter-spacing: .2px; text-transform: none;
+  color: var(--ac-ok); background: rgba(61,220,151,.10); border: 1px solid rgba(61,220,151,.35); transition: all .6s ease; }
+.care-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.care-status[data-state="watch"] { color: var(--ac-watch); background: rgba(255,176,32,.10); border-color: rgba(255,176,32,.45); }
+.care-status[data-state="help"]  { color: var(--ac-help);  background: rgba(255,138,61,.12); border-color: rgba(255,138,61,.55); }
+.care-status[data-state="off"]   { color: var(--ac-dim);   background: rgba(255,255,255,.05); border-color: var(--ac-line); }
+.care-status[data-state="watch"] .care-dot, .care-status[data-state="help"] .care-dot { animation: care-pulse 1.4s ease-in-out infinite; }
+.aura-clock { order: 2; font-family: var(--ac-mono); font-size: 12px; color: var(--ac-dim); font-variant-numeric: tabular-nums; }
+#data-source-badge { display: none; }                 /* the Room panel's tag says demo / live */
+#settings-btn { order: 3; background: none; border: none; width: 28px; height: 28px; font-size: 16px; opacity: .5; }
 #settings-btn:hover { background: none; opacity: 1; }
+
+/* ---- side panels ---- */
+.aura-panel { position: absolute; top: 92px; width: 300px; padding: 16px; border-radius: 14px; pointer-events: auto;
+  background: var(--ac-panel); border: 1px solid var(--ac-line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  display: flex; flex-direction: column; gap: 12px; font-family: var(--ac-ui); color: var(--ac-text); }
+#aura-motion { left: 16px; }
+#aura-chat { right: 16px; max-height: calc(100vh - 124px); }
+.ap-title { display: flex; align-items: center; justify-content: space-between; margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.2px; }
+.ap-tag { font-family: var(--ac-mono); font-size: 10px; font-weight: 400; letter-spacing: 1px; text-transform: uppercase; color: var(--ac-dim); }
+.ap-block { border: 1px solid var(--ac-line-soft); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.ap-grow { min-height: 0; flex: 1; }
+.ap-label { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; color: var(--ac-dim); }
+.ap-headline { font-size: 19px; font-weight: 500; line-height: 1.25; letter-spacing: -.2px; transition: color .8s ease; }
+body[data-care="watch"] .ap-headline { color: var(--ac-watch); }
+body[data-care="help"]  .ap-headline { color: var(--ac-help); }
+.ap-rows { margin: 0; display: flex; flex-direction: column; gap: 7px; }
+.ap-rows > div { display: flex; justify-content: space-between; font-size: 13.5px; }
+.ap-rows dt { color: var(--ac-dim); }
+.ap-rows dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+.aura-score { font-size: 30px; font-weight: 500; line-height: 1; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+.aura-motion-state { font-family: var(--ac-mono); font-size: 10px; letter-spacing: 1px; color: var(--ac-dim); }
+.aura-motion-state[data-s="moving"] { color: var(--ac-ok); }
+#aura-spark { width: 100%; height: 60px; display: block; }
+
+/* check-in steps: a short vertical timeline */
+#care-strip-title { color: var(--ac-text); text-transform: none; letter-spacing: 0; font-size: 13.5px; }
+#care-strip[data-state="watch"] #care-strip-title { color: var(--ac-watch); }
+#care-strip[data-state="help"]  #care-strip-title { color: var(--ac-help); }
+#care-strip[data-state="ok"]    #care-strip-title { color: var(--ac-ok); }
+#care-strip-time { font-family: var(--ac-mono); font-size: 11px; }
+.cs-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.cs-step { position: relative; padding: 5px 0 5px 20px; font-size: 13.5px; color: var(--ac-dim); }
+.cs-step::before { content: ''; position: absolute; left: 2px; top: 11px; width: 7px; height: 7px; border-radius: 50%;
+  border: 1.5px solid currentColor; box-sizing: border-box; }
+.cs-step:not(:last-child)::after { content: ''; position: absolute; left: 5px; top: 20px; bottom: -9px; width: 1px; background: var(--ac-line); }
+.cs-step[data-s="done"] { color: var(--ac-text); }
+.cs-step[data-s="done"]::before, .cs-step[data-s="ok"]::before, .cs-step[data-s="help"]::before, .cs-step[data-s="now"]::before { background: currentColor; }
+.cs-step[data-s="now"]  { color: var(--ac-watch); }
+.cs-step[data-s="now"]::before { animation: care-pulse 1.4s ease-in-out infinite; }
+.cs-step[data-s="help"] { color: var(--ac-help); }
+.cs-step[data-s="ok"]   { color: var(--ac-ok); }
+
+/* iMessage conversation */
+#aura-chat-body { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.aura-empty { font-size: 13px; line-height: 1.45; color: var(--ac-dim); }
+.aura-msg { max-width: 90%; display: flex; flex-direction: column; gap: 3px; animation: aura-in .35s ease-out; }
+.aura-msg.out { align-self: flex-end; align-items: flex-end; }
+.aura-msg.in  { align-self: flex-start; align-items: flex-start; }
+.aura-who, .aura-status { font-family: var(--ac-mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--ac-dim); }
+.aura-bubble { font-size: 13px; line-height: 1.4; padding: 8px 11px; border-radius: 14px; white-space: pre-line; color: #fff; }
+.aura-msg.out .aura-bubble { background: #0a84ff; border-bottom-right-radius: 4px; }
+.aura-msg.out.caregiver .aura-bubble { background: #0f766e; }
+.aura-msg.in .aura-bubble { background: rgba(255,255,255,.14); border-bottom-left-radius: 4px; }
+.aura-msg.failed .aura-bubble { background: rgba(255,48,64,.25); border: 1px solid rgba(255,48,64,.6); }
+@keyframes aura-in { from { opacity: 0; } to { opacity: 1; } }
+
+@media (max-width: 1000px) { #aura-chat { display: none; } .aura-panel { width: 250px; } }
+@media (prefers-reduced-motion: reduce) { #aura-vignette, .care-dot, .cs-step::before { animation: none !important; } }
+#brand, #status-bar { z-index: 3; }

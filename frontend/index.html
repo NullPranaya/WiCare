@@ -15,13 +15,13 @@
 
     <!-- Top-left: Branding -->
     <div id="brand">
-      <div id="brand-logo"><span class="aura-mark" aria-hidden="true"></span>AuraCare</div>
-      <div id="brand-tagline">Living room &middot; sensed over Wi-Fi, no camera</div>
+      <div id="brand-logo"><b>aura</b><i>care</i></div>
     </div>
 
     <!-- Top-right: Connection + status + gear -->
     <div id="status-bar">
       <div id="care-status" class="care-status" data-state="ok"><span class="care-dot"></span><span id="care-status-label">Monitoring</span></div>
+      <span id="aura-clock" class="aura-clock"></span>
       <div id="data-source-badge">
         <span class="dot dot--demo"></span>
         <span id="data-source-label">DEMO</span>
@@ -107,47 +107,43 @@
       <div id="fall-alert" class="fall-alert" style="display:none">FALL DETECTED</div>
     </div>
 
-    <!-- AuraCare instruments (dot-matrix, no cards). Breath + room use RuView data, hidden when the backend drives the page -->
+    <!-- AuraCare layout: top bar, Room panel (left), Check-in panel (right). Scene stays clear in the middle. -->
     <div id="aura-vignette" aria-hidden="true"></div>
-    <div id="aura-breath" class="aura-sim">
-      <canvas id="aura-breath-c" role="img" aria-label="Breathing rhythm"></canvas>
-      <div class="ab-mid"><span id="aura-bpm">--</span><span class="ab-unit">breaths / min</span><span id="aura-inout" class="ab-io"></span></div>
-    </div>
-    <div id="aura-room" class="aura-sim">
-      <canvas id="aura-room-c" role="img" aria-label="Where movement has been in the room"></canvas>
-      <div id="aura-room-label" class="ar-label">--</div>
-    </div>
-    <div id="aura-now" role="status" aria-live="polite"><span id="aura-sentence"></span></div>
+    <div id="aura-topbar" aria-hidden="true"></div>
 
-    <!-- AuraCare live: movement score from the backend (shown only when /care/state answers) -->
-    <div id="aura-motion" class="data-panel" hidden>
-      <div class="panel-header"><span>Movement</span><span class="aura-live"><span class="aura-live-dot"></span>live</span></div>
-      <div class="aura-motion-row">
-        <span id="aura-score" class="aura-score">--</span>
-        <span id="aura-motion-state" class="aura-motion-state">--</span>
+    <section id="aura-motion" class="aura-panel" aria-label="Room">
+      <h2 class="ap-title">Room <span id="aura-source" class="ap-tag">demo</span></h2>
+      <div class="ap-block">
+        <div id="aura-sentence" class="ap-headline" role="status" aria-live="polite">--</div>
+        <dl class="ap-rows">
+          <div><dt>Breathing</dt><dd id="aura-bpm">--</dd></div>
+          <div><dt>People</dt><dd id="aura-people">--</dd></div>
+          <div><dt>Sensor</dt><dd id="aura-sensor">--</dd></div>
+        </dl>
       </div>
-      <canvas id="aura-spark" role="img" aria-label="Movement over the last 60 seconds"></canvas>
-      <div class="aura-motion-foot"><span>last 60 s</span><span id="aura-sensor">sensor --</span></div>
-    </div>
+      <div class="ap-block">
+        <div class="ap-label"><span>Movement &middot; last 60 s</span><span id="aura-motion-state" class="aura-motion-state">--</span></div>
+        <div id="aura-score" class="aura-score">--</div>
+        <canvas id="aura-spark" role="img" aria-label="Movement over the last 60 seconds"></canvas>
+      </div>
+    </section>
 
-    <!-- AuraCare live: the real check-in conversation (roles only, never phone numbers) -->
-    <div id="aura-chat" class="data-panel" hidden>
-      <div class="panel-header"><span>iMessage check-in</span><span id="aura-chat-meta"></span></div>
-      <div id="aura-chat-body"></div>
-    </div>
-
-    <!-- AuraCare: event strip (hidden until an event) -->
-    <div id="care-strip" role="status" aria-live="polite" hidden>
-      <span class="cs-dot"></span>
-      <span id="care-strip-title">Possible fall &middot; unconfirmed</span>
-      <span class="cs-steps">
-        <span class="cs-step" id="cs-1">Detected</span>
-        <span class="cs-step" id="cs-2">Check-in sent</span>
-        <span class="cs-step" id="cs-3">Reply</span>
-        <span class="cs-step" id="cs-4">Nurse</span>
-      </span>
-      <span id="care-strip-time"></span>
-    </div>
+    <section id="aura-chat" class="aura-panel" aria-label="Check-in">
+      <h2 class="ap-title">Check-in <span id="aura-chat-meta" class="ap-tag"></span></h2>
+      <div id="care-strip" class="ap-block" role="status" aria-live="polite">
+        <div class="ap-label"><span id="care-strip-title">No active check-in</span><span id="care-strip-time"></span></div>
+        <ol class="cs-steps">
+          <li class="cs-step" id="cs-1">Detected</li>
+          <li class="cs-step" id="cs-2">Check-in sent</li>
+          <li class="cs-step" id="cs-3">Reply</li>
+          <li class="cs-step" id="cs-4">Nurse</li>
+        </ol>
+      </div>
+      <div class="ap-block ap-grow">
+        <div class="ap-label"><span>iMessage</span></div>
+        <div id="aura-chat-body"><div class="aura-empty">Messages appear here when a check-in is sent.</div></div>
+      </div>
+    </section>
 
     <!-- Edge module badges (populated dynamically by HudController) -->
     <div id="edge-modules-bar"></div>

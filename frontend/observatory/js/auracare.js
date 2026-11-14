@@ -10,7 +10,7 @@
  * DEMO source (nothing reachable): plays an older-adult story on RuView's simulated data. Badge stays "DEMO".
  */
 import { PoseSystem } from './pose-system.js';
-import { BreathRing, RoomTrail, dotChart, TONES } from './aura-viz.js';
+import { dotChart } from './aura-viz.js';
 
 const STORY = [
   { scenario: 'elderly_care', dur: 26 },
@@ -19,7 +19,7 @@ const STORY = [
 // seconds after the fall pose appears (demo pacing only)
 const T_CHECKIN = 4, T_REPLY = 10, T_CAREGIVER = 11;
 const API = new URLSearchParams(location.search).get('api') || `http://${location.hostname || 'localhost'}:8000`;
-const POLL_MS = 1000, BACKEND_LOST_MS = 4000;
+const POLL_MS = 1000, BACKEND_LOST_MS = 10000;   // ride out short hiccups instead of flipping to demo mid-demo
 
 const $ = (id) => document.getElementById(id);
 const POSE_WORDS = { walking: 'Walking around the living room', standing: 'Standing', sitting: 'Sitting down',
@@ -35,8 +35,7 @@ export class AuraCare {
     PoseSystem.frail = true;            // slower gait, slight stoop (pose-system.js)
     this._last = { mode: false };       // so the first failed poll doesn't restart the demo story (?scene=fall)
     this.status = 'ok';
-    this.breath = new BreathRing($('aura-breath-c'));
-    this.room = new RoomTrail($('aura-room-c'));
+    this.hist = []; this.histT = 1;
     this.care = null; this._okAt = 0; this._scene = null; this._eventId = null; this._msgKey = '';
     // ?scene=fall starts the demo story at the fall (handy on stage)
     const scene = new URLSearchParams(location.search).get('scene');
@@ -62,8 +61,10 @@ export class AuraCare {
     if (on === this._last.mode) return;
     this._last.mode = on;
     document.body.classList.toggle('aura-backend', on);
-    $('aura-motion').hidden = !on;
-    $('aura-chat').hidden = !on;
+    this._text('aura-source', on ? 'live' : 'demo');
+    this._msgKey = '';
+    if (!on) { $('aura-chat-body').textContent = ''; const e = document.createElement('div'); e.className = 'aura-empty';
+      e.textContent = 'Demo story: no real messages are sent.'; $('aura-chat-body').appendChild(e); this._text('aura-chat-meta', ''); }
     if (on) { this._setScene('elderly_care'); this._eventId = null; }
     else { this._last.key = null; this.i = -1; this._next(); }
     const lbl = $('data-source-label');
@@ -89,19 +90,28 @@ export class AuraCare {
     });
   }
 
-  // breath ring, room trail and the plain-words line, all from the same frame RuView draws the scene with
+  // Room panel in demo / RuView mode: every value comes from the same frame RuView draws the scene with
   _instruments(d, dt) {
-    const tone = TONES[this.status] || TONES.ok;
     const bpm = d.vital_signs && d.vital_signs.breathing_rate_bpm;
-    const io = this.breath.draw(dt, bpm, tone);
-    this._text('aura-bpm', bpm > 0 ? String(Math.round(bpm)) : '--');
-    this._text('aura-inout', io);
     const persons = d.persons || [];
-    this.room.draw(dt, persons, tone);
-    const pose = persons[0] && persons[0].pose;
     const n = d.estimated_persons != null ? d.estimated_persons : persons.length;
-    this._text('aura-room-label', n ? `${n} ${n === 1 ? 'person' : 'people'} · trail of the last 20 s` : 'room empty');
-    this._text('aura-sentence', !n ? 'Nobody in the room' : POSE_WORDS[pose] || 'Moving');
+    const p = persons[0];
+    this._text('aura-bpm', bpm > 0 ? `${Math.round(bpm)} / min` : '--');
+    this._text('aura-people', String(n));
+    this._text('aura-sensor', 'simulated');
+    this._text('aura-sentence', !n ? 'Nobody in the room' : POSE_WORDS[p && p.pose] || 'Moving');
+    const m = p ? Math.min(1, (p.motion_score || 0) / 255) : 0;
+    this.histT += dt;
+    if (this.histT >= 1) {
+      this.histT = 0;
+      this.hist.push(m); if (this.hist.length > 60) this.hist.shift();
+      const L = this.hist.length;
+      dotChart($('aura-spark'), this.hist.map((v, k) => [k - (L - 1), v]), null, null);
+      this._text('aura-score', `${Math.round(m * 100)}%`);
+      const st = $('aura-motion-state'), moving = m >= 0.2;
+      if (st) { st.dataset.s = moving ? 'moving' : 'still'; st.textContent = moving ? 'MOVING' : 'STILL'; }
+      this._text('aura-clock', hhmmss(new Date()));
+    }
   }
 
   _next() {
@@ -151,7 +161,10 @@ export class AuraCare {
       st.dataset.s = s.latest == null ? '' : moving ? 'moving' : 'still';
       st.textContent = s.latest == null ? 'NO DATA' : moving ? 'MOVING' : 'STILL';
     }
-    this._text('aura-sensor', fresh ? 'sensor live' : `sensor ${c.sensor ? c.sensor.status.replace('_', ' ') : '--'}`);
+    this._text('aura-sensor', fresh ? 'live' : c.sensor ? c.sensor.status.replace('_', ' ') : '--');
+    this._text('aura-bpm', 'not measured');
+    this._text('aura-people', '--');
+    this._text('aura-clock', hhmmss(new Date()));
     dotChart($('aura-spark'), s.series || [], s.high, s.low);
     this._text('aura-sentence', !fresh ? "Can't see the room right now" : c.status === 'help' ? 'Help requested'
       : c.event ? 'Sudden movement, then stillness' : s.latest == null ? '' : moving ? 'Moving around' : 'Quiet');
@@ -201,11 +214,9 @@ export class AuraCare {
     this._text('care-status-label', s.label);
     const strip = $('care-strip');
     if (!strip) return;
-    strip.hidden = !s.step;
-    if (!s.step) return;
-    strip.dataset.state = s.status;
-    this._text('care-strip-title', s.title || '');
-    this._text('care-strip-time', s.since ? hhmm(s.since) : '');
+    strip.dataset.state = s.step ? s.status : 'idle';
+    this._text('care-strip-title', s.step ? s.title || '' : 'No active check-in');
+    this._text('care-strip-time', s.step && s.since ? hhmm(s.since) : '');
     const ok = s.status === 'ok', help = s.status === 'help';
     for (let k = 1; k <= 4; k++) {
       const el = $(`cs-${k}`);
