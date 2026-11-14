@@ -21,6 +21,7 @@ from fallguard.alerts import AlertManager
 from fallguard.board import BoardHealth, BoardStatus, MotionSample
 from fallguard.config import AppConfig
 from fallguard.detector import FallDetector, Status, level_for
+from fallguard.fusion import Fusion
 
 SampleSource = Callable[[], AsyncIterator[MotionSample | BoardStatus]]
 HealthSource = Callable[[], Awaitable[list[BoardHealth]]]
@@ -47,6 +48,8 @@ class Engine:
         self.clock = clock
         self.wall = wall
         self.detector = FallDetector(config.rule)
+        board_ids = [b for b, _ in config.boards]
+        self.fusion = Fusion(board_ids, config.rule.threshold) if len(board_ids) > 1 else None
         self.clients: set[asyncio.Queue] = set()
         self.boards: dict[str, dict] = {
             board_id: {"type": "board", "board": board_id, "connected": False, "detail": "starting",
@@ -91,9 +94,14 @@ class Engine:
             return
         self._log_sample(item)
         self.broadcast({"type": "sample", "board": item.board, "t": item.t, "score": item.score})
+        if self.fusion is not None:
+            level = self.fusion.update(item)
+            if level is None:
+                return
+        else:
+            level = level_for(item.score, self.config.rule.threshold)
         previous = self.detector.status
-        status = self.detector.update(item.t, level_for(item.score, self.config.rule.threshold))
-        self._publish(previous, status)
+        self._publish(previous, self.detector.update(item.t, level))
 
     def _publish(self, previous: Status, status: Status) -> None:
         if status.state is not previous.state or status.new_fall or status.armed is not previous.armed:

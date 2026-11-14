@@ -168,3 +168,36 @@ def test_websocket_library_installed_for_uvicorn():
     import importlib.util
 
     assert importlib.util.find_spec("websockets") or importlib.util.find_spec("wsproto")
+
+
+def test_two_boards_one_noisy_no_fall(tmp_path):
+    config = make_config(tmp_path, boards=(("a", "http://x/espectre/v1"), ("b", "http://y/espectre/v1")))
+    sent, sender = recorder()
+    app = create_app(
+        config,
+        [scripted(*FALL_SCRIPT, board="a"), scripted((10.0, 0.01), board="b")],
+        None,
+        AlertManager(sender, cooldown_s=60),
+        clock=lambda: 0.0,
+        wall=lambda: WALL,
+    )
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws") as ws:
+            _, seen = receive_until(ws, lambda m: m["type"] == "sample" and m["board"] == "a" and m["t"] == 9.75)
+    assert not any(m["type"] == "state" and m["state"] == "FALL" for m in seen)
+    assert sent == []
+
+
+def test_two_boards_agreeing_fall(tmp_path):
+    config = make_config(tmp_path, boards=(("a", "http://x/espectre/v1"), ("b", "http://y/espectre/v1")))
+    app = create_app(
+        config,
+        [scripted(*FALL_SCRIPT, board="a"), scripted(*FALL_SCRIPT, board="b")],
+        None,
+        AlertManager(None, cooldown_s=60),
+        clock=lambda: 0.0,
+        wall=lambda: WALL,
+    )
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws") as ws:
+            receive_until(ws, lambda m: m["type"] == "state" and m["state"] == "FALL")
