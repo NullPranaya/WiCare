@@ -5,6 +5,8 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from backend.service import Service
 from backend.db import now
+from backend import care_state
+from fastapi.middleware.cors import CORSMiddleware
 from photon import checkins, webhook
 from investigation import investigator
 from photon import reply_parser
@@ -28,6 +30,11 @@ async def lifespan(app):
     stop.set()
 
 app = FastAPI(title='AuraCare', lifespan=lifespan)
+# the room UI (frontend/, served on :3000) reads /care/state; local origins only, read-only
+app.add_middleware(CORSMiddleware, allow_origin_regex=r'http://(localhost|127\.0\.0\.1)(:\d+)?', allow_methods=['GET'])
+
+@app.get('/care/state')
+def care(): return care_state.snapshot(svc)
 
 def _404(x, what):
     if not x: raise HTTPException(404, f'{what} not found')

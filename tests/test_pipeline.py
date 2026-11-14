@@ -71,3 +71,15 @@ def test_ml_only_attached_after_validation(svc):
     svc.latest_ml = (now(), dict(status='ok', activity='walk', model_score=0.5))
     ev2 = svc.create_event('esp32_01', 'live_score', 'prolonged_low_activity', 5.0, [], {})
     assert ev2['ml']['activity'] == 'walk' and ev2['ml']['source'] == 'live_csi'
+
+def test_care_state_follows_checkin(svc):
+    from backend import care_state
+    s = care_state.snapshot(svc)
+    assert s['step'] == 0 and s['messages'] == []
+    ev = feed_fall_like(svc)
+    s = care_state.snapshot(svc)
+    assert s['event']['id'] == ev['id'] and s['step'] == 2 and s['status'] == 'watch'
+    assert [m['role'] for m in s['messages']] == ['patient'] and '+1' not in str(s)     # roles only, no numbers
+    svc.db.x("UPDATE checkins SET state='timeout'")
+    s = care_state.snapshot(svc)
+    assert s['status'] == 'help' and s['step'] == 4
