@@ -1,0 +1,73 @@
+from tests.conftest import feed_fall_like
+from photon import checkins
+
+def msgs(svc, role=None):
+    q = 'SELECT * FROM messages WHERE direction="out"' + (f' AND role="{role}"' if role else '')
+    return svc.db.q(q)
+
+def test_abrupt_then_still_creates_one_checkin_and_one_message(svc):
+    ev = feed_fall_like(svc)
+    assert ev and ev['event_type'] == 'abrupt_motion_then_inactivity'
+    assert ev['policy']['action'] == 'routine_checkin' and ev['checkin_id']
+    assert ev['review_status'] == 'unconfirmed'
+    assert len(ev['evidence_ids']) > 5 and all(i.startswith('obs_') for i in ev['evidence_ids'])
+    assert [m['status'] for m in msgs(svc, 'patient')] == ['mock_sent']
+    # same pattern again while check-in is open: evidence updates, no new message
+    ev2 = feed_fall_like(svc, t0=1_000_100.0)
+    assert ev2['policy']['action'] == 'update_existing'
+    assert len(msgs(svc, 'patient')) == 1
+
+def test_stale_sensor_is_unavailable_not_inactivity(svc):
+    svc.observe('esp32_01', 0.3)
+    svc.db.x('UPDATE sensors SET last_seen = last_seen - 60')
+    h = svc.health('esp32_01')
+    assert h['fresh'] is False and h['status'] == 'stale'
+    ev = svc.create_event('esp32_01', 'live_score', 'prolonged_low_activity', 1.0, [], {})
+    assert ev['policy']['action'] == 'sensor_unavailable' and ev['checkin_id'] is None
+    assert msgs(svc) == []
+
+def test_gap_resets_detector(svc):
+    t = 1_000_000.0
+    for s in [0.3] * 4 + [0.95]:
+        svc.observe('esp32_01', s, ts=t); t += 0.5
+    svc.db.x('UPDATE sensors SET last_seen = last_seen - 60')     # outage
+    ev = None
+    for s in [0.05] * 26:
+        ev = svc.observe('esp32_01', s, ts=t) or ev; t += 0.5
+    assert ev is None                                             # spike before the gap is forgotten
+
+def test_replay_outside_demo_mode_never_messages(svc):
+    svc.s.demo_mode = False
+    ev = feed_fall_like(svc, source='wifall_replay')
+    assert ev['policy']['action'] == 'monitor' and msgs(svc) == []
+
+def test_no_opt_in_no_message(svc):
+    svc.s.participant_opt_in = False
+    ev = feed_fall_like(svc)
+    assert ev['policy']['action'] == 'monitor' and msgs(svc) == []
+
+def test_delivery_failure_recorded(svc):
+    svc.s.patient_address = ''
+    ev = feed_fall_like(svc)
+    c = checkins.get(svc.db, ev['checkin_id'])
+    assert c['state'] == 'delivery_failed'
+    assert msgs(svc, 'patient')[0]['status'] == 'delivery_failed'
+    assert len(msgs(svc, 'caregiver')) == 1
+
+def test_timeout_escalates(svc):
+    ev = feed_fall_like(svc)
+    svc.db.x('UPDATE checkins SET deadline = 0')
+    assert checkins.sweep_timeouts(svc.db, svc.photon) == 1
+    assert checkins.get(svc.db, ev['checkin_id'])['state'] == 'timeout'
+    assert len(msgs(svc, 'caregiver')) == 1
+    assert checkins.sweep_timeouts(svc.db, svc.photon) == 0       # not repeated
+
+def test_ml_only_attached_after_validation(svc):
+    from backend.db import now
+    svc.latest_ml = (now(), dict(status='ok', activity='walk', model_score=0.5))
+    ev = feed_fall_like(svc)
+    assert ev['ml']['status'] == 'live_har_not_validated'
+    svc.s.live_har_validated = True
+    svc.latest_ml = (now(), dict(status='ok', activity='walk', model_score=0.5))
+    ev2 = svc.create_event('esp32_01', 'live_score', 'prolonged_low_activity', 5.0, [], {})
+    assert ev2['ml']['activity'] == 'walk' and ev2['ml']['source'] == 'live_csi'

@@ -1,0 +1,5 @@
+{
+  "q_hat": 0.877537952002793,
+  "alpha": 0.1,
+  "method": "split conformal on leave-one-participant-out ensemble scores"
+}

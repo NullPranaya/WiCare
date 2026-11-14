@@ -1,0 +1,4 @@
+{ "name": "auracare-photon-bridge", "private": true, "type": "module",
+  "scripts": { "start": "bun bridge.ts", "typecheck": "tsc --noEmit" },
+  "dependencies": { "spectrum-ts": "^12.16.0" },
+  "devDependencies": { "typescript": "^5", "@types/node": "^22" } }

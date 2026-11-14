@@ -1,0 +1,14 @@
+# tested 2026-11-14, all free/open source, no paid APIs
+numpy
+pandas
+scipy
+scikit-learn
+joblib
+torch          # CPU build is enough: pip install torch --index-url https://download.pytorch.org/whl/cpu
+fastapi==0.163.0
+uvicorn
+httpx
+requests
+python-dotenv
+pydantic==2.14.3
+pytest

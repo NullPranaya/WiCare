@@ -1,0 +1,11 @@
+.env
+*.db
+*.db-*
+calibration.json
+data/
+models/*.joblib
+photon/bridge/node_modules/
+__pycache__/
+.venv/
+models/*.pt
+auracare.db*

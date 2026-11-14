@@ -1,0 +1,155 @@
+{
+  "protocol": "leave-one-participant-out, 926 clips, 3 s at 50 Hz",
+  "classes": [
+    "fall",
+    "jump",
+    "sit",
+    "stand",
+    "walk"
+  ],
+  "majority_baseline_macro_f1": 0.133,
+  "rf": {
+    "macro_f1_pooled": 0.405,
+    "macro_f1_9small_mean": 0.402,
+    "macro_f1_9small_std": 0.104,
+    "fall_vs_rest_bal_acc": 0.687,
+    "fall_recall": 0.553,
+    "fall_precision": 0.755,
+    "confusion": [
+      [
+        256,
+        15,
+        165,
+        23,
+        4
+      ],
+      [
+        27,
+        28,
+        29,
+        21,
+        10
+      ],
+      [
+        30,
+        17,
+        47,
+        20,
+        2
+      ],
+      [
+        23,
+        24,
+        17,
+        28,
+        22
+      ],
+      [
+        3,
+        25,
+        3,
+        15,
+        72
+      ]
+    ]
+  },
+  "cnn": {
+    "macro_f1_pooled": 0.487,
+    "macro_f1_9small_mean": 0.54,
+    "macro_f1_9small_std": 0.099,
+    "fall_vs_rest_bal_acc": 0.778,
+    "fall_recall": 0.65,
+    "fall_precision": 0.872,
+    "confusion": [
+      [
+        301,
+        23,
+        92,
+        33,
+        14
+      ],
+      [
+        9,
+        51,
+        16,
+        36,
+        3
+      ],
+      [
+        26,
+        35,
+        23,
+        27,
+        5
+      ],
+      [
+        8,
+        34,
+        7,
+        51,
+        14
+      ],
+      [
+        1,
+        7,
+        3,
+        14,
+        93
+      ]
+    ]
+  },
+  "ensemble": {
+    "macro_f1_pooled": 0.505,
+    "macro_f1_9small_mean": 0.496,
+    "macro_f1_9small_std": 0.082,
+    "fall_vs_rest_bal_acc": 0.775,
+    "fall_recall": 0.659,
+    "fall_precision": 0.859,
+    "confusion": [
+      [
+        305,
+        18,
+        116,
+        17,
+        7
+      ],
+      [
+        12,
+        53,
+        15,
+        33,
+        2
+      ],
+      [
+        29,
+        36,
+        28,
+        22,
+        1
+      ],
+      [
+        9,
+        37,
+        7,
+        48,
+        13
+      ],
+      [
+        0,
+        8,
+        2,
+        14,
+        94
+      ]
+    ]
+  },
+  "conformal_ensemble": {
+    "alpha": 0.1,
+    "target_coverage": 0.9,
+    "coverage": 0.915,
+    "avg_set_size": 2.85,
+    "confident_single_label_frac": 0.11,
+    "true_falls_with_fall_in_set": 0.946
+  },
+  "deployed_q_hat_alpha_0_1": 0.8810132714961163
+}
