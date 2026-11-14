@@ -4,3 +4,5 @@ espectre-main/
 node_modules/
 __pycache__/
 .venv/
+fallguard/data/
+*.egg-info/
