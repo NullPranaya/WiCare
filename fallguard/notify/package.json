@@ -1,0 +1,8 @@
+{
+  "name": "fallguard-notify",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "spectrum-ts": "^12.16.0"
+  }
+}
