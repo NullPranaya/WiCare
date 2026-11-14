@@ -201,3 +201,36 @@ def test_two_boards_agreeing_fall(tmp_path):
     with TestClient(app) as client:
         with client.websocket_connect("/ws") as ws:
             receive_until(ws, lambda m: m["type"] == "state" and m["state"] == "FALL")
+
+
+def test_no_data_shows_no_signal(tmp_path):
+    with TestClient(build(tmp_path, [])) as client:
+        with client.websocket_connect("/ws") as ws:
+            ws.receive_json()
+            assert ws.receive_json()["state"] == "NO_SIGNAL"
+
+
+def test_source_crash_reports_disconnect_and_restarts(tmp_path):
+    # review finding: an unexpected error must not end ingestion for good
+    runs = {"n": 0}
+
+    def source():
+        async def gen():
+            runs["n"] += 1
+            await asyncio.sleep(0.3)
+            yield BoardStatus("b1", True, "connected")
+            if runs["n"] == 1:
+                yield MotionSample("b1", 1.0, 0.01, 1000)
+                raise RuntimeError("stream broke")
+            yield MotionSample("b1", 99.0, 0.01, 99000)
+            await asyncio.Event().wait()
+
+        return gen()
+
+    app = create_app(make_config(tmp_path), [source], None, AlertManager(None, 60),
+                     clock=lambda: 0.0, wall=lambda: WALL, restart_delay_s=0.0)
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws") as ws:
+            _, seen = receive_until(ws, lambda m: m["type"] == "sample" and m["t"] == 99.0)
+    crashed = [m for m in seen if m["type"] == "board" and not m["connected"] and "stream broke" in m["detail"]]
+    assert crashed and runs["n"] == 2

@@ -105,3 +105,10 @@ def test_disarm_mid_stillness_suppresses_fall():
     feed(d, 1, 3, "still")
     d.set_armed(False, 3.0)
     assert feed(d, 3, 12, "still").falls == [] and d.status.state is State.MONITORING
+
+
+def test_starts_in_no_signal_until_first_sample():
+    # review finding: with no data the dashboard must not claim "Monitoring"
+    d = FallDetector(RuleConfig())
+    assert d.status.state is State.NO_SIGNAL
+    assert d.update(0.0, "still").state is State.MONITORING

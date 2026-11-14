@@ -41,7 +41,7 @@ class FallDetector:
     def __init__(self, config: RuleConfig, armed: bool = True) -> None:
         self.config = config
         self.armed = armed
-        self._state = State.MONITORING
+        self._state = State.NO_SIGNAL  # no data yet: never claim to be monitoring
         self._since = 0.0
         self._last_sample: float | None = None
         self._burst_start = 0.0

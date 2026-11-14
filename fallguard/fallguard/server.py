@@ -49,7 +49,11 @@ class Engine:
         self.wall = wall
         self.detector = FallDetector(config.rule)
         board_ids = [b for b, _ in config.boards]
-        self.fusion = Fusion(board_ids, config.rule.threshold) if len(board_ids) > 1 else None
+        self.fusion = (
+            Fusion(board_ids, config.rule.threshold, max_gap_s=config.rule.max_gap_s)
+            if len(board_ids) > 1
+            else None
+        )
         self.clients: set[asyncio.Queue] = set()
         self.boards: dict[str, dict] = {
             board_id: {"type": "board", "board": board_id, "connected": False, "detail": "starting",
@@ -90,6 +94,8 @@ class Engine:
         if isinstance(item, BoardStatus):
             board = self.boards.setdefault(item.board, {"type": "board", "board": item.board})
             board.update(connected=item.connected, detail=item.detail)
+            if not item.connected and self.fusion is not None:
+                self.fusion.disconnect(item.board)
             self.broadcast(dict(board))
             return
         self._log_sample(item)
@@ -149,12 +155,25 @@ def create_app(
     mode: Mode = "live",
     clock: Callable[[], float] = time.monotonic,
     wall: Callable[[], datetime] = datetime.now,
+    restart_delay_s: float = 1.0,
 ) -> FastAPI:
     engine = Engine(config, alerts, mode, clock, wall)
 
     async def consume(source: SampleSource) -> None:
-        async for item in source():
-            engine.handle(item)
+        """Run a source; on an unexpected error mark its board offline and restart it."""
+        board_id: str | None = None
+        while True:
+            try:
+                async for item in source():
+                    board_id = item.board
+                    engine.handle(item)
+                return  # a finite source (replay) ended normally
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # keep ingesting no matter what broke
+                if board_id is not None:
+                    engine.handle(BoardStatus(board_id, False, f"{type(exc).__name__}: {exc}"))
+                await asyncio.sleep(restart_delay_s)
 
     async def ticker() -> None:
         while True:
