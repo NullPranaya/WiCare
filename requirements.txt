@@ -9,6 +9,7 @@ fastapi==0.163.0
 uvicorn
 httpx
 requests
+websocket-client   # monitoring/csi_worker.py (hub /v1/csi stream)
 python-dotenv
 pydantic==2.14.3
 pytest

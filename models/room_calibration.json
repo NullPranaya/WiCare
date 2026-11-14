@@ -1,0 +1,5 @@
+{
+  "thresholds": {"high": 0.8, "low": 0.4, "still_s": 8.0, "inactive_s": 60.0},
+  "note": "room movement score (ml/room_motion.py, median of 3). Chosen on cross-fitted streams of session S20261114_1541: 0 false events on 13 recordings incl. 28 sit/stand/jump prompts. No falls recorded: rehearse the demo motion.",
+  "created_utc": "2026-11-14T21:45:00Z"
+}

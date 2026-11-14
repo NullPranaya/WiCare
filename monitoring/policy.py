@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 
 LIVE_SOURCES = {'live_score', 'live_csi'}
-DEMO_SOURCES = {'wifall_replay', 'synthetic'}
+DEMO_SOURCES = {'wifall_replay', 'synthetic', 'room_replay'}
 
 @dataclass
 class Decision:

@@ -97,11 +97,12 @@ def ingest_ml(pred: dict):
 async def photon_webhook(request: Request):
     raw = await request.body()
     h = {k.lower(): v for k, v in request.headers.items()}
-    if not (webhook.verify_bridge(h, svc.s.bridge_secret) or webhook.verify_spectrum(h, raw, svc.s.spectrum_webhook_secret)):
-        raise HTTPException(401, 'bad signature')
+    if not webhook.verify(h, raw, svc.s.photon_webhook_secret):
+        raise HTTPException(400, 'bad signature')                         # Photon docs: 400, do not process
+    with open('photon_events.jsonl', 'ab') as f: f.write(raw + b'\n')     # verified raw events, git-ignored
     msg = webhook.normalize(json.loads(raw))
     if not msg or not msg['message_id']:
-        return dict(ignored='non-text or malformed')
+        return dict(ignored='non-text, own message, or not a message event')
     role = svc.s.role_of(msg['sender_id'])
     if not role:
         return dict(ignored='unauthorized sender')                       # never reply to unknown numbers

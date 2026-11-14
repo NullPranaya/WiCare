@@ -26,31 +26,36 @@ Reproduce: `python -m ml.data data/raw/WiFall data/clips.npz && python -m ml.tra
 ## Run
 ```bash
 python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
-cp .env.example .env            # fill in test numbers
-pytest -q                       # 20 tests
-
+cp .env.example .env                              # test numbers, Photon keys (see below)
+cp models/room_calibration.json calibration.json  # detector thresholds for the room model
+pytest -q                                         # 24 tests
 uvicorn backend.main:app --host 127.0.0.1 --port 8000
-python -m monitoring.calibrate $ESP_IP          # once: 20 s still, 20 s normal movement
-python -m monitoring.runner $ESP_IP             # live
-# no board / replay view:
-PLAYLIST=data/raw/WiFall/ID8/walk/<file>.csv uvicorn sim.replay_sensor:app --port 62587
-python -m monitoring.runner 127.0.0.1 --source wifall_replay
 ```
 
-### Photon
-Photon has no public HTTP send endpoint today, so `photon/bridge/bridge.ts` (spectrum-ts 12.16.0, type-checked)
-holds the iMessage connection, exposes local `POST /send`, and forwards inbound texts to `/webhooks/photon`.
-No ngrok needed.
+### Demo runbook (2 nodes + hub.py on the sensing laptop)
 ```bash
-cd photon/bridge && cp .env.example .env && bun install && bun --env-file=.env bridge.ts
-# then in backend .env: PHOTON_MODE=bridge
+# terminal 1: backend (above). terminal 2: public URL for Photon replies
+cloudflared tunnel --url http://127.0.0.1:8000     # paste <url>/webhooks/photon into Photon > Webhooks
+# terminal 3: live movement score from the boards (hub.py serves /v1/csi on :8770)
+python -m monitoring.csi_worker --hub ws://<hub laptop>:8770/v1/csi
+# no boards: replay the room recording (labelled room_replay, demo mode only)
+python -m monitoring.csi_worker --replay <dataset dir> --chunks p1_moving_1,p1_still_1
+# last-resort fallback, labelled synthetic: burst then stillness, no CSI
+python -m monitoring.csi_worker --synthetic
 ```
-Native Spectrum webhooks are also accepted (HMAC `v0:<ts>:<body>`, 5 min window) if you register one.
+Flow: movement burst (score >= 0.8) then 8 s still (score <= 0.4, median of 3) -> event -> iMessage check-in to the
+patient -> "OK" closes it; "2"/help or no reply in `CHECKIN_TIMEOUT_S` (15 s) -> caregiver alert; caregiver can
+ask "why did this alert?" and gets the evidence. `EXPECTED_ACTIVE=0` for the demo so a quiet room never texts anyone.
+Rehearse the demo motion on the real boards first: no falls were recorded, so the trigger is only validated on
+recorded movement -> stillness transitions.
 
-## Verify on the day
-- First line printed by `monitoring.runner` is the raw motion payload. If the score key isn't one of
-  `movement, score, motion_score, value`, edit `SCORE_KEYS` in `sensors/espectre_client.py` (RuView feed format TBD).
-- `bridge.ts` was type-checked, not run against a live Photon account.
+### Photon (2.0 Beta REST API, verified live 2026-11-14)
+1. Dashboard: copy Project id, create an API key -> `.env` `PHOTON_PROJECT_ID`, `PHOTON_PROJECT_API_KEY`.
+2. iMessage > Add someone to the line: both test phones. Each phone texts its assigned line once (shared-line rule).
+3. Webhooks > Add a destination: `<tunnel>/webhooks/photon`, all events -> `.env` `PHOTON_WEBHOOK_SECRET` (whsec_...).
+4. `.env` `PHOTON_MODE=api`, restart uvicorn. `mock` logs messages without sending.
+Sends: `photon/client.py` (users -> assigned line -> space -> messages). Replies: Standard Webhooks signature,
+event `message.received` with the message in `data.object`. The tunnel URL changes when cloudflared restarts.
 
 ## Guarantees (each has a test)
 | Rule | Test |
@@ -64,13 +69,16 @@ Native Spectrum webhooks are also accepted (HMAC `v0:<ts>:<body>`, 5 min window)
 | Activity model only attached after live validation | `test_ml_only_attached_after_validation` |
 
 Demo thresholds are accelerated settings, not clinical recommendations. No fall detection or diagnosis claims.
-Upstream: WiFall (RS2002/WiFall), Photon spectrum-ts, ESPectre/RuView firmware.
+Upstream: WiFall (RS2002/WiFall), Photon, RuView firmware.
 
-## Live CSI (RuView boards, 3 x ESP32)
-- Model is trained at **50 Hz** (`python -m ml.train_rf data/clips.npz --rate 50`), matching the boards.
-- `sensors/csi_adapter.py`: 64 subcarriers (128 bytes) -> WiFall's 52 in order [-26..-1, +1..+26]
-  (`SORTED`). If the invalid-first-word flag is set, subcarrier +1 is filled from its neighbour.
-- Laptop receive time is the clock; sequence numbers count drops; windows with gaps > 0.1 s or < 80% coverage are skipped.
-- `python -m ml.check_live recording.json`: rate, drops, layout check (correct layout << 1, wrong ~9), predictions.
-  Edit `load()` to the RuView JSON format.
-- Predictions attach to events only when `LIVE_HAR_VALIDATED=1`; per-board ensemble scores are averaged and a conformal set is attached (`ActivityModel.fuse`).
+## Live CSI (RuView boards, nodes 2 and 3, room recording S20261114_1541)
+- Per packet `raw[0:128]` = L-LTF, native order 0..31, -32..-1, [imag, real]. `sensors/csi_adapter.py` maps to
+  52 subcarriers [-26..-1, +1..+26] (`SORTED`), confirmed on 26/26 node-recordings with `order_check_lag2`.
+  `first_word_sanitized` is set on every packet; subcarrier +1 is filled from its neighbour.
+- Measured: ~29 packets/s per node, ~34% lost (seq gaps), gaps up to 0.8 s. Windows use `ts_unix` + `seq`
+  (`window(..., expected_hz=29, max_gap_s=0.3, min_coverage=0.6)`), resampled to a 50 Hz grid.
+- WiFall activity model does not transfer to this room (`python -m ml.eval_auracare <dataset>`): in the empty room
+  "fall" is top in 23% of windows. It is not used for alerts.
+- Room movement model (`python -m ml.room_motion train <dataset>`), held out train _1 / test _2 and swap
+  (`python -m ml.eval_room <dataset>`): moving vs still/empty balanced acc 0.84, fired after 28/28 prompts;
+  occupied 0.81; people count 0.64 (context only, never suppresses alerts). One session only, so optimistic.

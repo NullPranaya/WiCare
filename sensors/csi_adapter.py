@@ -37,19 +37,39 @@ def order_check(bufs):
         out[name] = round(float(step[25] / (np.median(step) + 1e-9)), 2)
     return out
 
-def window(rx_times, seqs, amps, dt=0.02, length_s=2.96, max_gap_s=0.1, min_coverage=0.8, seq_mod=None):
+def order_check_lag2(bufs):
+    """Same idea as order_check, robust to a zeroed subcarrier (first_word_sanitized zeroes +1 on every
+    packet, which makes a lag-1 step there exactly 0 and fakes a perfect score). Compares the lag-2 phase
+    step across the half boundary (positions 25 -> 27, skipping 26) to the median lag-2 step, ignoring
+    pairs that touch an all-zero column."""
+    out = {}
+    C = np.stack([to_complex64(b) for b in bufs])
+    for name, idx in (('sorted', SORTED), ('raw_stripped', RAW_STRIPPED)):
+        c = C[:, idx]
+        dead = np.abs(c).max(0) == 0
+        step = np.abs(np.angle(np.exp(1j * np.angle(c[:, 2:] * np.conj(c[:, :-2]))).mean(0)))
+        ok = ~(dead[2:] | dead[:-2])
+        out[name] = round(float(step[25] / (np.median(step[ok]) + 1e-9)), 2) if ok[25] else None
+    return out
+
+def window(rx_times, seqs, amps, dt=0.02, length_s=2.96, max_gap_s=0.1, min_coverage=0.8, seq_mod=None,
+           expected_hz=None, end_t=None):
     """Build one model window (T x 52 on a dt grid) from the most recent packets of ONE board.
-    Uses laptop receive time (no chip timestamp); sequence numbers detect drops. Returns (x, info) or (None, info)."""
+    Uses laptop receive time (no chip timestamp); sequence numbers detect drops. Returns (x, info) or (None, info).
+    expected_hz: the board's real delivered rate (coverage is measured against it, default 1/dt). The 2026-11-14
+    room recording delivers ~29 Hz per node with ~34% loss, so use expected_hz=29, max_gap_s~0.3 there.
+    end_t: window end time (default: last packet)."""
     t = np.asarray(rx_times, float); s = np.asarray(seqs, np.int64); A = np.asarray(amps, np.float32)
-    keep = t >= t[-1] - length_s
+    end = t[-1] if end_t is None else end_t
+    keep = (t >= end - length_s) & (t <= end)
     t, s, A = t[keep], s[keep], A[keep]
     ds = np.diff(s) % seq_mod if seq_mod else np.diff(s)
     dropped = int(np.clip(ds - 1, 0, None).sum())
-    info = dict(n=len(t), dropped=dropped, coverage=round(len(t) / (length_s / dt), 2),
+    info = dict(n=len(t), dropped=dropped, coverage=round(len(t) / (length_s * (expected_hz or 1 / dt)), 2),
                 max_gap_s=round(float(np.diff(t).max()), 3) if len(t) > 1 else None)
     if len(t) < 2 or info['coverage'] < min_coverage or info['max_gap_s'] > max_gap_s:
         return None, {**info, 'ok': False}
     T = int(round(length_s / dt))
-    grid = t[-1] - length_s + np.arange(T) * dt
+    grid = end - length_s + np.arange(T) * dt
     x = np.stack([np.interp(grid, t, A[:, k]) for k in range(52)], 1)
     return x.astype(np.float32), {**info, 'ok': True}

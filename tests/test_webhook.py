@@ -1,20 +1,31 @@
-import hashlib, hmac, json, time
+import base64, hashlib, hmac, json, time
 import pytest
 from fastapi.testclient import TestClient
 import backend.main as main
-from tests.conftest import feed_fall_like
+from tests.conftest import feed_fall_like, WHSEC
 
 @pytest.fixture
 def client(svc, monkeypatch):
     monkeypatch.setattr(main, 'svc', svc)
     return TestClient(main.app)
 
-def payload(mid, sender, text):
-    return {'event': 'messages', 'space': {'id': 'any;-;' + sender},
-            'message': {'id': mid, 'sender': {'id': sender}, 'content': {'type': 'text', 'text': text}}}
+def payload(mid, sender, text, kind='human'):
+    """Photon 2.0 message.received event, shape copied from a real delivery (apiVersion 2026-07-01)."""
+    return {'id': 'evt_' + mid, 'apiVersion': '2026-07-01', 'type': 'message.received', 'source': 'imessage.photon',
+            'data': {'object': {'id': mid, 'content': {'type': 'text', 'format': 'plain', 'text': text},
+                                 'sentBy': {'id': 'pho_usr_' + sender[-4:], 'handle': sender, 'kind': kind},
+                                 'space': {'id': 'pho_spc_1', 'kind': 'direct'},
+                                 'createdAt': '2026-11-14T00:00:00.000Z'}}}
 
-def post(client, p, secret='bridge-test'):
-    return client.post('/webhooks/photon', json=p, headers={'x-bridge-secret': secret})
+def sign(raw, wid, ts, secret=WHSEC):
+    key = base64.b64decode(secret.removeprefix('whsec_'))
+    return 'v1,' + base64.b64encode(hmac.new(key, f'{wid}.{ts}.'.encode() + raw, hashlib.sha256).digest()).decode()
+
+def post(client, p, secret=WHSEC, ts=None):
+    raw = json.dumps(p).encode(); ts = str(ts or int(time.time())); wid = p['id']
+    h = {'webhook-id': wid, 'webhook-timestamp': ts, 'webhook-signature': sign(raw, wid, ts, secret),
+         'content-type': 'application/json'}
+    return client.post('/webhooks/photon', content=raw, headers=h)
 
 def state(svc, ev): return svc.checkin_for_event(ev['id'])['checkin']['state']
 
@@ -48,21 +59,23 @@ def test_duplicate_webhook_ignored(client, svc):
     assert post(client, payload('m1', '+15550000001', '2')).json() == {'duplicate': True}
     assert svc.db.one('SELECT count(*) n FROM messages WHERE role="caregiver" AND direction="out"')['n'] == 1
 
-def test_unknown_sender_and_bad_secret(client, svc):
+def test_unknown_sender_and_bad_signature(client, svc):
     feed_fall_like(svc)
     assert post(client, payload('m1', '+19999999999', 'OK')).json()['ignored'] == 'unauthorized sender'
-    assert post(client, payload('m2', '+15550000001', 'OK'), secret='wrong').status_code == 401
+    wrong = 'whsec_' + base64.b64encode(b'x' * 32).decode()
+    assert post(client, payload('m2', '+15550000001', 'OK'), secret=wrong).status_code == 400
 
-def test_native_spectrum_signature(client, svc):
+def test_signature_rotation_and_stale_timestamp(client, svc):
     feed_fall_like(svc)
-    raw = json.dumps(payload('m9', '+15550000001', 'OK')).encode()
-    ts = str(int(time.time()))
-    sig = 'v0=' + hmac.new(b'spectrum-test', b'v0:' + ts.encode() + b':' + raw, hashlib.sha256).hexdigest()
-    h = {'x-spectrum-event': 'messages', 'x-spectrum-timestamp': ts, 'x-spectrum-signature': sig,
-         'content-type': 'application/json'}
+    p = payload('m9', '+15550000001', 'OK'); raw = json.dumps(p).encode(); ts = str(int(time.time()))
+    old = sign(raw, p['id'], ts, 'whsec_' + base64.b64encode(b'o' * 32).decode())
+    h = {'webhook-id': p['id'], 'webhook-timestamp': ts, 'webhook-signature': old + ' ' + sign(raw, p['id'], ts)}
     assert client.post('/webhooks/photon', content=raw, headers=h).status_code == 200
-    h['x-spectrum-timestamp'] = str(int(time.time()) - 1000)
-    assert client.post('/webhooks/photon', content=raw, headers=h).status_code == 401
+    assert post(client, payload('m10', '+15550000001', 'OK'), ts=int(time.time()) - 1000).status_code == 400
+
+def test_own_agent_message_ignored(client, svc):
+    feed_fall_like(svc)
+    assert 'ignored' in post(client, payload('m11', '+15550000001', 'OK', kind='agent')).json()
 
 def test_caregiver_question_gets_grounded_answer(client, svc):
     ev = feed_fall_like(svc)

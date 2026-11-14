@@ -21,10 +21,12 @@ class Settings:
         self.caregiver_address = os.getenv('CAREGIVER_ADDRESS', '')
         self.checkin_timeout_s = float(os.getenv('CHECKIN_TIMEOUT_S', '90'))
         # photon
-        self.photon_mode = os.getenv('PHOTON_MODE', 'mock')          # mock | bridge
-        self.bridge_url = os.getenv('PHOTON_BRIDGE_URL', 'http://127.0.0.1:8787')
-        self.bridge_secret = os.getenv('BRIDGE_SECRET', '')
-        self.spectrum_webhook_secret = os.getenv('SPECTRUM_WEBHOOK_SECRET', '')
+        self.photon_mode = os.getenv('PHOTON_MODE', 'mock')          # mock | api
+        self.photon_api_base = os.getenv('PHOTON_API_BASE', 'https://api.photon.codes')
+        self.photon_project_id = os.getenv('PHOTON_PROJECT_ID', '')
+        self.photon_api_key = os.getenv('PHOTON_PROJECT_API_KEY', '')  # pho_sk_...
+        self.photon_webhook_secret = os.getenv('PHOTON_WEBHOOK_SECRET', '')  # whsec_...
+        self.photon_line = os.getenv('PHOTON_LINE', '')              # optional: our line's E.164; else looked up per assignment
         # live activity model: only attached to events after the live-vs-WiFall check passed
         self.live_har_validated = _b('LIVE_HAR_VALIDATED', '0')
 

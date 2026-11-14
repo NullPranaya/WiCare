@@ -1,35 +1,43 @@
-"""Inbound messages. Two accepted senders of webhooks:
-1) our local spectrum-ts bridge (shared secret header), 2) Spectrum Cloud native webhooks
-(X-Spectrum-Signature = 'v0=' + HMAC_SHA256(secret, 'v0:<timestamp>:<raw body>'), 5 min tolerance)."""
-import hashlib, hmac, time
+"""Inbound Photon 2.0 (Beta) webhook events, signed with Standard Webhooks:
+signature = base64(HMAC_SHA256(base64decode(secret without 'whsec_'), f'{id}.{timestamp}.{raw body}')),
+header 'webhook-signature' = space-separated 'v1,<b64>' entries, 5 min timestamp tolerance."""
+import base64, hashlib, hmac, time
 
 EXACT = {'ok': 'acknowledged', '1': 'acknowledged', 'help': 'help_requested', '2': 'help_requested',
          'away': 'away', '3': 'away'}
 
-def verify_spectrum(headers, raw: bytes, secret, tolerance=300):
-    ts, sig = headers.get('x-spectrum-timestamp'), headers.get('x-spectrum-signature')
-    if not (secret and ts and sig and headers.get('x-spectrum-event')):
+def exact_intent(text):
+    return EXACT.get(text.strip().strip('.!').lower())
+
+def verify(headers, raw: bytes, secret, tolerance=300):
+    wid, ts, sigs = headers.get('webhook-id'), headers.get('webhook-timestamp'), headers.get('webhook-signature')
+    if not (secret and wid and ts and sigs):
         return False
     try:
         if abs(time.time() - int(ts)) > tolerance: return False
+        key = base64.b64decode(secret.removeprefix('whsec_'))
     except ValueError:
         return False
-    expected = 'v0=' + hmac.new(secret.encode(), b'v0:' + ts.encode() + b':' + raw, hashlib.sha256).hexdigest()
-    return len(expected) == len(sig) and hmac.compare_digest(expected, sig)
+    expected = base64.b64encode(hmac.new(key, f'{wid}.{ts}.'.encode() + raw, hashlib.sha256).digest()).decode()
+    return any(s.partition(',')[0] == 'v1' and hmac.compare_digest(s.partition(',')[2], expected)
+               for s in sigs.split())
 
-def verify_bridge(headers, secret):
-    got = headers.get('x-bridge-secret', '')
-    return bool(secret) and hmac.compare_digest(got, secret)
+def _find_message(obj, depth=0):
+    """The event wrapper shape is not documented outside the authed event catalog, so locate the
+    PlatformMessage object (has 'sentBy' and 'content') wherever it sits in the event."""
+    if depth > 4 or not isinstance(obj, dict): return None
+    if isinstance(obj.get('sentBy'), dict) and isinstance(obj.get('content'), dict): return obj
+    for v in obj.values():
+        m = _find_message(v, depth + 1)
+        if m: return m
+    return None
 
 def normalize(payload):
-    """Spectrum 'messages' event -> flat dict. Returns None for non-text content."""
-    if payload.get('event') != 'messages': return None
-    m = payload.get('message') or {}
-    c = m.get('content') or {}
-    if c.get('type') != 'text': return None
-    return dict(message_id=m.get('id'), sender_id=(m.get('sender') or {}).get('id'),
-                space_id=(payload.get('space') or {}).get('id'), text=(c.get('text') or '').strip(),
-                received_at=m.get('timestamp'))
-
-def exact_intent(text):
-    return EXACT.get(text.strip().strip('.!').lower())
+    """Photon event -> flat dict. None for non-text, non-message, or our own (agent) messages."""
+    m = _find_message(payload)
+    if not m: return None
+    c, by = m['content'], m['sentBy']
+    if c.get('type') != 'text' or by.get('kind') == 'agent': return None
+    return dict(message_id=m.get('id'), sender_id=by.get('handle'), sender_user_id=by.get('id'),
+                space_id=(m.get('space') or {}).get('id'), text=(c.get('text') or '').strip(),
+                received_at=m.get('createdAt'))

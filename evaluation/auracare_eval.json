@@ -1,0 +1,555 @@
+{
+ "session": "S20261114_1541",
+ "window": {
+  "dt": 0.02,
+  "length_s": 2.96,
+  "max_gap_s": 0.3,
+  "min_coverage": 0.6,
+  "expected_hz": 29.0
+ },
+ "windows": {
+  "ok": 729,
+  "no_window": 18
+ },
+ "per_state": {
+  "empty": {
+   "windows": 111,
+   "top": {
+    "stand": 80,
+    "fall": 26,
+    "jump": 3,
+    "walk": 2
+   },
+   "fall_in_set_rate": 0.73,
+   "fall_top_rate": 0.234,
+   "abstain_rate": 1.0,
+   "fall_score_mean": 0.229
+  },
+  "p1_still": {
+   "windows": 114,
+   "top": {
+    "walk": 13,
+    "stand": 65,
+    "fall": 17,
+    "jump": 19
+   },
+   "fall_in_set_rate": 0.579,
+   "fall_top_rate": 0.149,
+   "abstain_rate": 1.0,
+   "fall_score_mean": 0.175
+  },
+  "p1_moving": {
+   "windows": 111,
+   "top": {
+    "stand": 53,
+    "walk": 25,
+    "jump": 31,
+    "fall": 2
+   },
+   "fall_in_set_rate": 0.162,
+   "fall_top_rate": 0.018,
+   "abstain_rate": 1.0,
+   "fall_score_mean": 0.079
+  },
+  "p2_still": {
+   "windows": 112,
+   "top": {
+    "fall": 48,
+    "walk": 61,
+    "stand": 3
+   },
+   "fall_in_set_rate": 0.929,
+   "fall_top_rate": 0.429,
+   "abstain_rate": 1.0,
+   "fall_score_mean": 0.301
+  },
+  "p2_moving": {
+   "windows": 112,
+   "top": {
+    "walk": 76,
+    "jump": 8,
+    "stand": 28
+   },
+   "fall_in_set_rate": 0.259,
+   "fall_top_rate": 0.0,
+   "abstain_rate": 1.0,
+   "fall_score_mean": 0.087
+  },
+  "p1_sitstand": {
+   "windows": 112,
+   "top": {
+    "walk": 74,
+    "jump": 15,
+    "stand": 16,
+    "fall": 7
+   },
+   "fall_in_set_rate": 0.58,
+   "fall_top_rate": 0.062,
+   "abstain_rate": 1.0,
+   "fall_score_mean": 0.158
+  },
+  "p1_jump": {
+   "windows": 57,
+   "top": {
+    "walk": 37,
+    "jump": 8,
+    "fall": 9,
+    "stand": 3
+   },
+   "fall_in_set_rate": 0.596,
+   "fall_top_rate": 0.158,
+   "abstain_rate": 1.0,
+   "fall_score_mean": 0.171
+  }
+ },
+ "per_action": {
+  "sit_down": {
+   "n": 10,
+   "top": {
+    "fall": 1,
+    "walk": 8,
+    "jump": 1
+   },
+   "fall_in_set": 4
+  },
+  "stand_up": {
+   "n": 9,
+   "top": {
+    "walk": 8,
+    "jump": 1
+   },
+   "fall_in_set": 4
+  },
+  "jump": {
+   "n": 9,
+   "top": {
+    "walk": 6,
+    "jump": 2,
+    "stand": 1
+   },
+   "fall_in_set": 3
+  }
+ },
+ "actions": [
+  {
+   "chunk": "p1_sitstand_1",
+   "action": "sit_down",
+   "status": "ok",
+   "top": "fall",
+   "fall_in_set": true,
+   "scores": {
+    "fall": 0.287,
+    "jump": 0.18,
+    "sit": 0.13,
+    "stand": 0.238,
+    "walk": 0.164
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_1",
+   "action": "stand_up",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": true,
+   "scores": {
+    "fall": 0.197,
+    "jump": 0.137,
+    "sit": 0.192,
+    "stand": 0.205,
+    "walk": 0.269
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_1",
+   "action": "sit_down",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.042,
+    "jump": 0.152,
+    "sit": 0.052,
+    "stand": 0.245,
+    "walk": 0.509
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_1",
+   "action": "stand_up",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.031,
+    "jump": 0.14,
+    "sit": 0.041,
+    "stand": 0.188,
+    "walk": 0.599
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_1",
+   "action": "sit_down",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": true,
+   "scores": {
+    "fall": 0.184,
+    "jump": 0.061,
+    "sit": 0.067,
+    "stand": 0.242,
+    "walk": 0.446
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_1",
+   "action": "stand_up",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.083,
+    "jump": 0.205,
+    "sit": 0.062,
+    "stand": 0.311,
+    "walk": 0.339
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_1",
+   "action": "sit_down",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": true,
+   "scores": {
+    "fall": 0.168,
+    "jump": 0.127,
+    "sit": 0.023,
+    "stand": 0.305,
+    "walk": 0.377
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_1",
+   "action": "stand_up",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": true,
+   "scores": {
+    "fall": 0.164,
+    "jump": 0.105,
+    "sit": 0.064,
+    "stand": 0.224,
+    "walk": 0.444
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_1",
+   "action": "sit_down",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.08,
+    "jump": 0.077,
+    "sit": 0.079,
+    "stand": 0.25,
+    "walk": 0.513
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_2",
+   "action": "sit_down",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.075,
+    "jump": 0.243,
+    "sit": 0.084,
+    "stand": 0.216,
+    "walk": 0.382
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_2",
+   "action": "stand_up",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.037,
+    "jump": 0.194,
+    "sit": 0.057,
+    "stand": 0.311,
+    "walk": 0.401
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_2",
+   "action": "sit_down",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.035,
+    "jump": 0.157,
+    "sit": 0.068,
+    "stand": 0.326,
+    "walk": 0.414
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_2",
+   "action": "stand_up",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": true,
+   "scores": {
+    "fall": 0.211,
+    "jump": 0.209,
+    "sit": 0.068,
+    "stand": 0.237,
+    "walk": 0.275
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_2",
+   "action": "sit_down",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.046,
+    "jump": 0.122,
+    "sit": 0.037,
+    "stand": 0.18,
+    "walk": 0.614
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_2",
+   "action": "stand_up",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.115,
+    "jump": 0.099,
+    "sit": 0.086,
+    "stand": 0.19,
+    "walk": 0.51
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_2",
+   "action": "sit_down",
+   "status": "ok",
+   "top": "jump",
+   "fall_in_set": true,
+   "scores": {
+    "fall": 0.144,
+    "jump": 0.297,
+    "sit": 0.08,
+    "stand": 0.213,
+    "walk": 0.265
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_2",
+   "action": "stand_up",
+   "status": "ok",
+   "top": "jump",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.082,
+    "jump": 0.353,
+    "sit": 0.046,
+    "stand": 0.219,
+    "walk": 0.3
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_2",
+   "action": "sit_down",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.09,
+    "jump": 0.096,
+    "sit": 0.084,
+    "stand": 0.197,
+    "walk": 0.533
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_sitstand_2",
+   "action": "stand_up",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": true,
+   "scores": {
+    "fall": 0.147,
+    "jump": 0.057,
+    "sit": 0.024,
+    "stand": 0.228,
+    "walk": 0.544
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_jump_1",
+   "action": "jump",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.121,
+    "jump": 0.115,
+    "sit": 0.136,
+    "stand": 0.288,
+    "walk": 0.339
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_jump_1",
+   "action": "jump",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.12,
+    "jump": 0.094,
+    "sit": 0.146,
+    "stand": 0.233,
+    "walk": 0.407
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_jump_1",
+   "action": "jump",
+   "status": "ok",
+   "top": "jump",
+   "fall_in_set": true,
+   "scores": {
+    "fall": 0.149,
+    "jump": 0.459,
+    "sit": 0.041,
+    "stand": 0.183,
+    "walk": 0.168
+   },
+   "n_boards": 1
+  },
+  {
+   "chunk": "p1_jump_1",
+   "action": "jump",
+   "status": "ok",
+   "top": "jump",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.113,
+    "jump": 0.303,
+    "sit": 0.045,
+    "stand": 0.238,
+    "walk": 0.301
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_jump_1",
+   "action": "jump",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.097,
+    "jump": 0.108,
+    "sit": 0.08,
+    "stand": 0.29,
+    "walk": 0.425
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_jump_1",
+   "action": "jump",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.064,
+    "jump": 0.074,
+    "sit": 0.018,
+    "stand": 0.141,
+    "walk": 0.704
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_jump_1",
+   "action": "jump",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": true,
+   "scores": {
+    "fall": 0.229,
+    "jump": 0.102,
+    "sit": 0.036,
+    "stand": 0.302,
+    "walk": 0.331
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_jump_1",
+   "action": "jump",
+   "status": "ok",
+   "top": "stand",
+   "fall_in_set": true,
+   "scores": {
+    "fall": 0.169,
+    "jump": 0.236,
+    "sit": 0.062,
+    "stand": 0.312,
+    "walk": 0.222
+   },
+   "n_boards": 2
+  },
+  {
+   "chunk": "p1_jump_1",
+   "action": "jump",
+   "status": "ok",
+   "top": "walk",
+   "fall_in_set": false,
+   "scores": {
+    "fall": 0.035,
+    "jump": 0.109,
+    "sit": 0.084,
+    "stand": 0.243,
+    "walk": 0.529
+   },
+   "n_boards": 2
+  }
+ ]
+}

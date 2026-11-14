@@ -5,6 +5,8 @@ from backend.config import Settings
 from backend.service import Service
 from monitoring.anomaly import Thresholds
 
+WHSEC = 'whsec_' + __import__('base64').b64encode(b'photon-test-secret-32-bytes-long').decode()
+
 @pytest.fixture
 def svc(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
@@ -12,7 +14,7 @@ def svc(tmp_path, monkeypatch):
     s.db_path = str(tmp_path / 't.db'); s.photon_mode = 'mock'
     s.participant_opt_in = True; s.demo_mode = True; s.expected_active = True
     s.patient_address, s.caregiver_address = '+15550000001', '+15550000002'
-    s.bridge_secret, s.spectrum_webhook_secret = 'bridge-test', 'spectrum-test'
+    s.photon_webhook_secret = WHSEC
     s.stale_after_s = 5; s.checkin_timeout_s = 90
     v = Service(s)
     v.set_calibration(Thresholds(high=0.8, low=0.1, still_s=10, inactive_s=60), 'test', path=str(tmp_path / 'cal.json'))
