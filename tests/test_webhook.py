@@ -81,3 +81,10 @@ def test_caregiver_question_gets_grounded_answer(client, svc):
     ev = feed_fall_like(svc)
     r = post(client, payload('c1', '+15550000002', 'why did this alert?')).json()
     assert r['answered'] and ev['id'] in r['text'] and 'threshold' in r['text']
+
+def test_photon_idempotency_header_is_valid_and_stable():
+    import re
+    from photon.client import idem_header
+    k = 'checkin:chk_1:caregiver:No reply to the check-in before the deadline.'
+    h = idem_header(k)
+    assert re.fullmatch(r'[\x21-\x7e]{1,255}', h) and h == idem_header(k) and h != idem_header(k + 'x')

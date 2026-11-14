@@ -3,8 +3,13 @@ Send = create/get User for the recipient handle -> find the shared line assigned
 create/get the direct Space (line agent first) -> POST /messages. Recipients are resolved by ROLE from
 server config; callers (including the investigator) can never pass an address.
 Shared-line rule: Photon only lets us send to a peer who has messaged the line since their Assignment."""
-import json, requests
+import hashlib, json, requests
 from backend.db import new_id, now
+
+def idem_header(key):
+    """Photon requires ^[\\x21-\\x7e]{1,255}$ (no spaces). Our keys can contain message text, so send a
+    deterministic hash: same logical key -> same header, so retries stay idempotent."""
+    return 'ac_' + hashlib.sha256(key.encode()).hexdigest()
 
 class PhotonClient:
     def __init__(self, db, settings):
@@ -17,7 +22,7 @@ class PhotonClient:
     # --- Photon API ---
     def _call(self, method, path, idem=None, **kw):
         h = {'Authorization': f'Bearer {self.s.photon_api_key}'}
-        if idem: h['Idempotency-Key'] = idem
+        if idem: h['Idempotency-Key'] = idem_header(idem)
         r = requests.request(method, f'{self.s.photon_api_base}/v1/projects/{self.s.photon_project_id}{path}',
                              headers=h, timeout=20, **kw)
         if r.status_code >= 400:
