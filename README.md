@@ -1,231 +1,305 @@
+<div align="center">
+
 # AuraCare
 
-**Camera-free check-ins for older adults who live alone.** AuraCare watches how Wi-Fi signals move through a room,
-notices when a burst of movement is followed by stillness, and texts the person a simple question over iMessage:
-*"Are you OK?"* If they answer "OK", nothing else happens. If they ask for help, or don't answer, their caregiver
-gets a message with the evidence behind the alert.
+### Checks on patients using the Wi-Fi waves already in the room.
 
-No cameras. No microphones. No wearables to forget. No paid AI APIs. Built for HackPrinceton Fall 2026.
+*No cameras. No microphones. No wearables. Just radio, physics, and a text message.*
 
-> **Scope.** AuraCare is a research prototype tested only with consenting teammates and fictional patients.
-> It is not a medical device and makes no fall-detection, clinical or diagnostic claims. Its job is to *ask*,
-> not to diagnose.
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-1D%20CNN-EE4C2C?logo=pytorch&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-random%20forest-F7931E?logo=scikitlearn&logoColor=white)
+![ESP32](https://img.shields.io/badge/ESP32-CSI%20sensing-E7352C?logo=espressif&logoColor=white)
+![iMessage](https://img.shields.io/badge/Photon-iMessage-34C759?logo=apple&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-24%20passing-brightgreen)
+![Paid APIs](https://img.shields.io/badge/paid%20APIs-0-blue)
+
+**HackPrinceton Fall 2026**
+
+</div>
+
+---
+
+Every Wi-Fi router fills a room with radio waves. Those waves bounce off walls, furniture and people before they
+reach a receiver. When a person moves, the bounces change, and the change is measurable down to the individual
+frequencies inside the signal.
+
+**AuraCare reads those changes.** Two ESP32 boards listen to the room's Wi-Fi, a model trained in that room turns
+the signal into a live movement score, and a set of temporal rules watches for one specific pattern: **a burst of
+movement followed by stillness.** When it sees that, AuraCare doesn't sound an alarm. It asks:
+
+> **AuraCare check-in (test):** we noticed an unusual movement pattern. Are you OK?
+> Reply 1 = OK, 2 = HELP, 3 = AWAY
+
+Reply "OK" and the check-in closes. Ask for help, or stay silent, and the caregiver's phone lights up with the
+event and the evidence behind it. The caregiver can text back *"why did this alert?"* and get an answer built
+only from recorded sensor data, with the IDs of the measurements it used.
+
+> [!NOTE]
+> AuraCare is a research prototype, tested only with consenting teammates and fictional patients. It is not a
+> medical device and makes no fall-detection, clinical or diagnostic claims. It asks. It never diagnoses.
 
 ---
 
 ## Contents
-- [Why](#why)
-- [What happens in the demo](#what-happens-in-the-demo)
-- [How it works](#how-it-works)
-- [Results](#results)
-- [Designed to fail safe](#designed-to-fail-safe)
-- [Getting started](#getting-started)
-- [Running the demo](#running-the-demo)
-- [API](#api)
-- [Repository layout](#repository-layout)
-- [Limitations and next steps](#limitations-and-next-steps)
-- [Credits](#credits)
+1. [The signal path](#1-the-signal-path)
+2. [Architecture](#2-architecture)
+3. [Inside the pipeline](#3-inside-the-pipeline)
+4. [Results](#4-results)
+5. [Fail-safe by design](#5-fail-safe-by-design)
+6. [Tech stack](#6-tech-stack)
+7. [Quickstart](#7-quickstart)
+8. [Running the demo](#8-running-the-demo)
+9. [API](#9-api)
+10. [Repository map](#10-repository-map)
+11. [Limitations and roadmap](#11-limitations-and-roadmap)
+12. [Credits](#12-credits)
 
 ---
 
-## Why
+## 1. The signal path
 
-People who live alone often go a long time before anyone notices that something is wrong. The usual answers each
-have a cost: cameras feel like surveillance in your own home, wearables only help if they are worn and charged,
-and emergency buttons only help if you can press them.
+```
+        ))) ))) )))                                                  ┌──────────────┐
+   ┌──────────────┐    2.4 GHz, ch 6, 20 MHz     ┌──────────────┐    │  64 complex  │
+   │  iPhone 15   │  ~~~~~~~~~~~~~~~~~~~~~~~~~>  │ ESP32 node 2 │───>│ subcarriers  │──┐
+   │  Pro hotspot │  ~~~~~~ bounce off  ~~~~~~>  └──────────────┘    │ per packet   │  │
+   │  (room ctr)  │  ~~~~~~ walls, people ~~~~>  ┌──────────────┐    └──────────────┘  │
+   └──────────────┘  ~~~~~~~~~~~~~~~~~~~~~~~~~>  │ ESP32 node 3 │───> same, ~29/s ─────┤
+                                                 └──────────────┘                      │
+                                                                                       v
+   ┌───────────┐   ┌────────────────┐   ┌──────────────────┐   ┌───────────────┐   ┌────────┐
+   │ iMessage  │<──│ check-in state │<──│ policy: opt-in,  │<──│ burst then 8s │<──│ P(move)│
+   │ patient + │   │ machine (15 s) │   │ sensor fresh, no │   │ stillness rule│   │ 1 Hz   │
+   │ caregiver │   └────────────────┘   │ open check-in    │   └───────────────┘   └────────┘
+   └───────────┘                        └──────────────────┘
+```
 
-Wi-Fi is already in the room. When a person moves, they change how radio signals bounce between a transmitter and
-a receiver, and cheap ESP32 boards can report those changes as **channel state information (CSI)**: the amplitude
-and phase of every Wi-Fi subcarrier, dozens of times per second. AuraCare turns that signal into a movement score,
-and pairs it with the most familiar interface there is: a text message.
+Each packet carries the **channel state information (CSI)** of 64 OFDM subcarriers: one complex number per
+frequency, describing how much that slice of the signal was weakened and shifted on its way across the room.
+A person walking through the room disturbs those numbers. A person lying still barely touches them.
 
-## What happens in the demo
+## 2. Architecture
+
+```mermaid
+flowchart LR
+    subgraph RF["Physical layer"]
+        TX[iPhone hotspot<br/>transmitter] -. multipath .-> N2[ESP32 node 2]
+        TX -. multipath .-> N3[ESP32 node 3]
+    end
+    subgraph EDGE["Sensing laptop"]
+        N2 --> HUB[hub.py<br/>ws /v1/csi]
+        N3 --> HUB
+    end
+    subgraph CORE["AuraCare core"]
+        HUB --> W[csi_worker<br/>timestamp windows]
+        W --> F[feature extraction<br/>23 features per node]
+        F --> M[room movement model<br/>random forest]
+        M --> S[median smoothing]
+        S --> D[temporal rules]
+        D --> P[deterministic policy]
+        P --> C[check-in<br/>state machine]
+        D --> I[evidence investigator]
+        I --> C
+        DB[(SQLite<br/>observations, events,<br/>check-ins, messages)]
+        W -.-> DB
+        D -.-> DB
+        C -.-> DB
+    end
+    subgraph MSG["Messaging"]
+        C <--> PH[Photon 2.0<br/>REST + signed webhooks]
+        PH <--> PT[Patient]
+        PH <--> CG[Caregiver]
+    end
+```
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Room as Room (2 ESP32 nodes)
-    participant AC as AuraCare backend
-    participant P as Patient's phone
-    participant C as Caregiver's phone
-
-    Room->>AC: CSI packets, ~29/s per node
-    AC->>AC: movement score every second
-    Note over AC: burst of movement, then 8 s of stillness
-    AC->>P: "AuraCare check-in (test): we noticed an unusual<br/>movement pattern. Are you OK? Reply 1 = OK, 2 = HELP, 3 = AWAY"
-    alt Patient replies "OK"
-        P->>AC: OK
-        AC->>AC: check-in closed (acknowledged)
-    else Patient asks for help, or no reply within 15 s
-        P-->>AC: "2" / "I can't get up" / silence
-        AC->>C: alert with event ID
-        C->>AC: "why did this alert?"
-        AC->>C: answer built from stored sensor evidence, with cited IDs
+    participant R as Room
+    participant A as AuraCare
+    participant P as Patient
+    participant C as Caregiver
+    R->>A: CSI stream, both nodes
+    A->>A: movement score every second
+    Note over A: score >= 0.8, then <= 0.4 for 8 s
+    A->>P: Are you OK? 1 = OK, 2 = HELP, 3 = AWAY
+    alt replies OK
+        P->>A: OK
+        A->>A: closed: acknowledged
+    else HELP, help words, or 15 s of silence
+        A->>C: alert + event ID
+        C->>A: why did this alert?
+        A->>C: evidence summary + cited observation IDs
     end
 ```
 
-## How it works
+## 3. Inside the pipeline
 
-```mermaid
-flowchart LR
-    subgraph Sensing
-        TX[iPhone hotspot<br/>transmitter] -. Wi-Fi .-> N2[ESP32 node 2]
-        TX -. Wi-Fi .-> N3[ESP32 node 3]
-        N2 --> HUB[hub.py<br/>ws /v1/csi]
-        N3 --> HUB
-    end
-    subgraph AuraCare
-        HUB --> W[csi_worker<br/>3 s windows]
-        W --> M[room movement model<br/>P moving]
-        M --> D[temporal rules<br/>burst then stillness]
-        D --> POL[deterministic policy]
-        POL --> CK[check-in state machine]
-        D --> INV[evidence investigator]
-    end
-    CK <--> PH[Photon iMessage API]
-    PH <--> PP[Patient]
-    PH <--> CG[Caregiver]
-    INV --> CK
-```
+### 3.1 Decoding the radio
+Almost every packet arrives as 256 signed bytes (802.11n): an L-LTF block and an HT-LTF block, each holding 64 subcarriers as
+`[imag, real]` pairs. AuraCare takes the L-LTF block (`raw[0:128]`) and rebuilds the complex channel:
 
-### 1. Sensing
-The test room is 2.5 x 2.5 x 2.5 m. An iPhone 15 Pro hotspot in the middle of the room (0.76 m high, 2.4 GHz,
-channel 6, 20 MHz) is the transmitter. Two ESP32-WROOM-32 boards in adjacent corners (0.40 m high, about 1.5 m
-from the phone) run RuView firmware and stream every CSI packet to a laptop. No MAC addresses are recorded;
-nodes are identified only by number.
+$$H_k = \text{real}_k + j \cdot \text{imag}_k, \qquad k \in \{0..31,\ -32..-1\}$$
 
-### 2. From packets to windows (`sensors/csi_adapter.py`)
-Each packet carries 64 subcarriers as `[imag, real]` int8 pairs. AuraCare takes the legacy L-LTF block
-(`raw[0:128]`), drops the 12 null and guard subcarriers, and reorders the remaining 52 into frequency order
-`[-26..-1, +1..+26]`. We checked that order with a phase-continuity test on every recording.
+It then drops the DC and guard subcarriers (12 of them) and reorders the remaining 52 into frequency order
+$[-26..-1,\ +1..+26]$. The order was verified, not assumed: a lag-2 phase-continuity test compares the phase jump
+across the middle of the band against the typical jump between neighbours. The correct layout won on
+**26 out of 26** node recordings.
 
-Real hardware is messy, so we measured it instead of trusting the spec sheet:
+### 3.2 Surviving real hardware
+Spec sheets said 45 to 50 packets per second. We measured the room instead:
 
-| Measured on our recording | Value |
+| Signal property | Measured |
 |---|---|
-| Packets delivered per node | ~29 per second (firmware cap: 50) |
-| Packets lost (gaps in sequence numbers) | ~34% |
-| Longest gap | 0.8 s |
-| Packets with the first subcarrier pair zeroed by the chip | 100% |
+| Packets delivered per node | **~29 / s** |
+| Packets lost in transit (sequence gaps) | **~34%** |
+| Longest gap | **0.8 s** |
+| Packets with subcarriers 0 and +1 zeroed by the chip | **100%** |
 
-So every window is built from the laptop's receive timestamps, not an assumed rate: 3 s of packets per node,
-resampled onto a 50 Hz grid, and skipped entirely if a gap is longer than 0.3 s.
+So nothing in AuraCare assumes a fixed rate. Every window is cut from laptop receive timestamps, checked with
+sequence numbers, and interpolated onto a 50 Hz grid:
 
-### 3. Movement score (`ml/room_motion.py`)
-For each node we compute 23 motion features per window (variation across subcarriers, step-to-step energy,
-where in the window the energy peaks, and the frequency content of the dominant motion component). A random forest
-trained on recordings of this room turns both nodes' features into one number: the probability that someone is
-moving. The worker smooths it with a rolling median of 3 and posts it once per second.
+- **length:** 2.96 s (148 samples)
+- **coverage:** at least 60% of the expected packets
+- **max gap:** 0.3 s, otherwise the window is discarded and nothing is inferred
 
-### 4. Temporal rules (`monitoring/anomaly.py`)
-An event is a **pattern over time**, not a single prediction:
+The zeroed subcarrier +1 is filled from its neighbour instead of feeding the model a fake zero.
 
-- a burst of movement (score >= 0.8), followed by
-- 8 seconds of stillness (score <= 0.4), with no return to movement in between.
+### 3.3 Turning waves into motion
+For each node and each window, AuraCare computes 23 motion features from the amplitude matrix
+$X \in \mathbb{R}^{148 \times 52}$:
 
-Thresholds live in `models/room_calibration.json` and were chosen on held-out data (see [Results](#results)).
-If the sensor feed drops out, the detector resets: missing data is never treated as stillness.
-
-### 5. Policy and check-in (`monitoring/policy.py`, `photon/checkins.py`)
-A deterministic policy decides whether to text anyone. It refuses if the sensor is stale, if the person hasn't
-opted in, or if a check-in is already open. Each check-in is a small state machine:
-
-| Patient reply | Result |
+| Family | What it captures |
 |---|---|
-| `OK` / `1` | Closed as *acknowledged* (an acknowledgment, not proof of safety) |
-| `HELP` / `2`, or words like "fell", "hurt", "can't get up" | Caregiver alerted |
-| `AWAY` / `3` | Closed as *away* |
-| Anything else | Marked *ambiguous*, caregiver asked to review. Free text never closes a check-in |
-| No reply within `CHECKIN_TIMEOUT_S` (15 s in the demo) | Caregiver alerted |
-| Message could not be delivered | Caregiver alerted |
+| Subcarrier spread | how much each frequency fluctuates over the window |
+| Step energy | $\lvert X_{t+1} - X_t \rvert$: how violently the channel changes between samples |
+| Energy timing | where in the 3 s the motion peaks, and early vs late energy |
+| Principal component | share of variance in the dominant motion direction (SVD) |
+| Spectral bands | power of that component in 0.3-1, 1-2, 2-4, 4-8 and 8-20 Hz bands |
+| Robust z-scores | fraction of samples far outside the window's own median |
 
-### 6. Evidence investigator (`investigation/investigator.py`)
-Every event gets a report built only from stored numbers: sensor health, activity before and after, the
-check-in history, and signal-quality checks. Every statement cites the observation IDs it came from. When the
-caregiver texts a question ("why did this alert?", "is the sensor working?", "did they reply?"), the answer is
-assembled from that report. There is no language model, so there is nothing to hallucinate.
+No absolute signal level is used, so the model reacts to *movement*, not to where the boards happen to sit.
 
-### 7. Messaging (`photon/`)
-Messages go through the **Photon 2.0 REST API** on shared iMessage lines. Sending is four calls (resolve user,
-find the line assigned to them, open the direct chat, send). Replies arrive as signed webhooks and are verified
-with the Standard Webhooks scheme before anything is processed. Recipients are always looked up by role
-(patient or caregiver) from server config, so no code path can text an arbitrary number.
+### 3.4 The movement score
+Both nodes' features are concatenated (46 values) and passed to a random forest trained on recordings of this
+exact room. The output is one number per second:
 
-## Results
+$$s_t = P(\text{moving} \mid \phi(X^{(2)}_t) \oplus \phi(X^{(3)}_t)), \qquad \tilde{s}_t = \text{median}(s_{t-2},\ s_{t-1},\ s_t)$$
 
-### Public benchmark: WiFall
-We first trained an activity classifier (fall, jump, sit, stand, walk) on the public
-[WiFall](https://github.com/RS2002/WiFall) dataset: 926 usable 3-second clips from 10 participants. Every number
-below is **leave-one-participant-out**: the model is always tested on a person it has never seen.
+### 3.5 The temporal rule
+An alert is a shape in time, not a single prediction:
 
-| Model | 5-class macro-F1 | Fall vs rest balanced accuracy | Fall precision |
+$$\exists\, t_0:\ \tilde{s}_{t_0} \ge 0.8 \quad\text{and}\quad \tilde{s}_t \le 0.4\ \ \forall\, t \in [t_1,\ t_1 + 8\,\text{s}],\ t_1 > t_0$$
+
+with no return to movement in between. If the sensor feed goes stale, the detector resets: **missing data is
+never treated as stillness.**
+
+### 3.6 The decision layer
+A deterministic policy, not a model, decides whether a human gets a message. Before texting anyone it checks
+that the sensor is fresh, the participant opted in, the event source is allowed, and no check-in is already open.
+
+| Patient reply | Outcome |
+|---|---|
+| `OK` / `1` | closed as *acknowledged* (an acknowledgment, not proof of safety) |
+| `HELP` / `2`, or "fell", "hurt", "can't get up", "dizzy"... | caregiver alerted |
+| `AWAY` / `3` | closed as *away* |
+| anything else | *ambiguous*: caregiver asked to review, check-in stays open |
+| no reply in 15 s | caregiver alerted |
+| message undeliverable | caregiver alerted |
+
+### 3.7 The evidence investigator
+Every event gets a report assembled only from stored numbers: sensor health, activity 30 s before and after,
+signal coverage, the check-in timeline. Every sentence cites the observation IDs it came from. Caregiver
+questions are routed by keyword to the right part of that report. **There is no language model anywhere in the
+loop, so there is nothing to hallucinate.**
+
+### 3.8 Messaging
+Outbound: four Photon 2.0 REST calls (resolve user, find their assigned iMessage line, open the direct space,
+send) with idempotency keys, so a retry can never double-text. Inbound: Standard Webhooks signatures
+(HMAC-SHA256 over `id.timestamp.body`, 5 minute window, secret rotation supported) verified before a single byte
+is processed. Recipients are resolved by role from server config: no code path can text an arbitrary number.
+
+## 4. Results
+
+### 4.1 Public benchmark: WiFall
+Five activities (fall, jump, sit, stand, walk), 926 usable 3 s clips, 10 participants.
+**Leave-one-participant-out**: every score is on a person the model has never seen.
+
+| Model | 5-class macro-F1 | Fall vs rest bal. acc | Fall precision |
 |---|---|---|---|
 | Majority baseline | 0.13 | 0.50 | - |
-| Random forest (handcrafted features) | 0.41 | 0.69 | 0.76 |
+| Random forest, handcrafted features | 0.41 | 0.69 | 0.76 |
 | 1D CNN | 0.49 | 0.78 | 0.87 |
-| RF + CNN ensemble | **0.51** | **0.78** | **0.86** |
+| **RF + CNN ensemble** | **0.51** | **0.78** | **0.86** |
 
-On top of the ensemble, split conformal prediction (90% target) reached 91.5% coverage with an average of 2.85
-labels per prediction, and "fall" was inside the prediction set for 94.6% of real falls. When the set has more
-than one label, the model abstains instead of guessing.
+**Split conformal prediction** on the ensemble ($\alpha = 0.1$): coverage **91.5%**, average set size 2.85, and
+"fall" inside the prediction set for **94.6%** of real falls. If the set holds more than one label, the model
+abstains.
 
-### Our room: what transferred and what didn't
-We then recorded our own room: 13 one-minute recordings (empty, one or two people still, one or two people moving,
-plus sit-down / stand-up and jump sessions with 28 spoken, timestamped prompts).
+### 4.2 Our room
+13 one-minute recordings: empty room, one and two people still, one and two people moving, plus sit-down /
+stand-up and jump sessions driven by **28 spoken, timestamped prompts**.
 
-**The WiFall model did not transfer.** Different hardware, a different room and a different sampling rate were
-too much. In the empty room it ranked "fall" first in 23% of windows, and it never produced a single-label
-prediction. So it is **not used for alerts**; it stays in the repo as a benchmark and is only attached to events
-after a live validation step (`LIVE_HAR_VALIDATED=1`).
+**The WiFall model did not transfer.** New hardware, new room, new sampling rate. In the empty room it ranked
+"fall" first in 23% of windows and never committed to a single label. It is kept as a benchmark and is **never
+used for alerts**.
 
-**A small model trained in the room did.** We trained on the first recording of each state and tested on the
-second, then swapped:
+**A model trained in the room did.** Train on recording 1 of each state, test on recording 2, then swap:
 
-| Task (held out) | Balanced accuracy |
+| Held-out task | Balanced accuracy |
 |---|---|
-| Moving vs still or empty | **0.84** |
-| Someone present vs empty room | 0.81 |
-| Number of people (0 / 1 / 2) | 0.64 |
+| Moving vs still / empty | **0.84** |
+| Occupied vs empty | 0.81 |
+| People count (0 / 1 / 2) | 0.64 |
 | Exact state (5 classes) | 0.57 |
 
-The movement score also flagged movement after **all 28** sit / stand / jump prompts, none of which it was
-trained on. Run through the alert rules on held-out score streams, the chosen thresholds produced **zero false
-events across all 13 recordings**, including every sit-down and jump.
-
-People counting at 0.64 is not reliable enough to act on, so it is never allowed to suppress an alert.
-
-Reproduce everything:
-```bash
-python -m ml.data data/raw/WiFall data/clips.npz          # WiFall clips -> 3 s windows
-python -m ml.train_rf data/clips.npz --rate 50 && python -m ml.train_cnn && python -m ml.evaluate
-python -m ml.eval_auracare <room dataset dir>             # WiFall model on our room
-python -m ml.eval_room <room dataset dir>                 # held-out room models
-python -m ml.room_motion train <room dataset dir>         # deployed movement model
-```
-
-## Designed to fail safe
-
-Each rule below has an automated test (`pytest -q`, 24 tests).
-
-| Rule | Tests |
+| Alert rule on held-out score streams | Result |
 |---|---|
-| A stale or offline sensor means "unavailable", never "the person is still"; gaps reset the detector | `test_stale_sensor_*`, `test_gap_resets_detector` |
-| Replayed or synthetic data never messages anyone outside demo mode; no opt-in, no message | `test_replay_*`, `test_no_opt_in_*`, `test_room_replay_is_demo_only` |
-| One check-in per event; duplicate webhooks and duplicate sends are ignored | `test_abrupt_*`, `test_duplicate_webhook_ignored` |
-| "OK" acknowledges; help words escalate; any other free text never closes a check-in | `test_ok_*`, `test_help_*`, `test_mixed_*`, `test_ambiguous_never_closes` |
-| Timeouts and delivery failures are recorded and escalated | `test_timeout_escalates`, `test_delivery_failure_recorded` |
-| Webhooks need a valid, fresh signature; rotated secrets work; our own outgoing messages are ignored | `test_unknown_sender_and_bad_signature`, `test_signature_rotation_and_stale_timestamp`, `test_own_agent_message_ignored` |
-| Investigator reports cite only IDs that exist; caregiver answers are grounded; replayed events are labelled | `test_report_*`, `test_stale_sensor_report_*`, `test_caregiver_question_gets_grounded_answer`, `test_replay_labelled` |
-| Activity labels are attached to events only after live validation | `test_ml_only_attached_after_validation` |
-| Windows respect the real packet rate and reject long gaps; layout check survives the zeroed subcarrier | `test_window_*`, `test_lag2_*` |
+| Movement detected after prompted actions | **28 / 28** |
+| False alerts across all 13 recordings, including every sit-down and jump | **0** |
 
-**Privacy.** No video, no audio, no MAC addresses. Phone numbers live only in a local `.env`. Every message is
-labelled as a test, and only consenting teammates are on the line.
+People counting at 0.64 is too weak to act on, so it is never allowed to cancel an alert.
 
-## Getting started
+## 5. Fail-safe by design
 
-Requirements: Python 3.10+ on macOS or Linux. For live messaging you also need a Photon account and
-`cloudflared`.
+24 automated tests, one or more per rule:
+
+| Guarantee | Tests |
+|---|---|
+| Stale or offline sensor = "unavailable", never "person is still"; gaps reset the detector | `test_stale_sensor_*`, `test_gap_resets_detector` |
+| Replayed or synthetic data never texts anyone outside demo mode; no opt-in, no message | `test_replay_*`, `test_no_opt_in_*`, `test_room_replay_is_demo_only` |
+| One check-in per event; duplicate webhooks and sends ignored | `test_abrupt_*`, `test_duplicate_webhook_ignored` |
+| OK acknowledges; help words escalate; free text never closes a check-in | `test_ok_*`, `test_help_*`, `test_mixed_*`, `test_ambiguous_never_closes` |
+| Timeouts and delivery failures escalate | `test_timeout_escalates`, `test_delivery_failure_recorded` |
+| Webhooks need a valid, fresh signature; rotation works; own messages ignored | `test_unknown_sender_and_bad_signature`, `test_signature_rotation_and_stale_timestamp`, `test_own_agent_message_ignored` |
+| Reports cite only real IDs; caregiver answers are grounded; replays are labelled | `test_report_*`, `test_stale_sensor_report_*`, `test_caregiver_question_gets_grounded_answer`, `test_replay_labelled` |
+| Activity labels attach to events only after live validation | `test_ml_only_attached_after_validation` |
+| Windows follow the real packet rate; layout check survives the zeroed subcarrier | `test_window_*`, `test_lag2_*` |
+
+**Privacy:** no video, no audio, no MAC addresses, phone numbers only in a local `.env`, every message labelled
+as a test, consenting teammates only.
+
+## 6. Tech stack
+
+| Layer | Technology | Role |
+|---|---|---|
+| Radio | iPhone 15 Pro hotspot, 2.4 GHz ch 6, 20 MHz HT | transmitter |
+| Sensors | 2x ESP32-WROOM-32 DevKit V1, RuView firmware | CSI capture, 64 subcarriers per packet |
+| Edge | RuView hub, WebSocket `/v1/csi` | raw packet stream with timestamps and sequence numbers |
+| Signal processing | NumPy, SciPy | subcarrier mapping, timestamp windowing, interpolation, SVD, FFT |
+| Machine learning | scikit-learn (random forest), PyTorch (1D CNN) | room movement score; WiFall benchmark ensemble |
+| Uncertainty | split conformal prediction | calibrated prediction sets and abstention |
+| Backend | FastAPI, Uvicorn, SQLite | ingestion, rules, policy, check-ins, evidence store |
+| Reasoning | deterministic investigator + keyword reply parser | grounded caregiver answers, no LLM |
+| Messaging | Photon 2.0 REST API, Standard Webhooks | iMessage check-ins and replies |
+| Networking | Cloudflare Tunnel | public HTTPS for webhooks |
+| Testing | pytest | 24 safety and correctness tests |
+
+## 7. Quickstart
+
+Python 3.10+ on macOS or Linux.
 
 ```bash
 git clone https://github.com/NullPranaya/Wi-Fall.git && cd Wi-Fall
@@ -236,96 +310,107 @@ cp models/room_calibration.json calibration.json
 pytest -q
 ```
 
-### Configuration (`.env`)
-
-| Variable | Meaning |
+| `.env` variable | Meaning |
 |---|---|
-| `PATIENT_ADDRESS`, `CAREGIVER_ADDRESS` | Test phone numbers in E.164 (`+1...`) |
-| `PARTICIPANT_OPT_IN` | Must be `1` before anyone is messaged |
-| `DEMO_MODE` | `1` allows replayed or synthetic events to message test numbers |
-| `EXPECTED_ACTIVE` | `0` for the demo: a long quiet period alone never triggers a text |
-| `CHECKIN_TIMEOUT_S` | Seconds to wait for a reply before alerting the caregiver (demo: 15) |
-| `PHOTON_MODE` | `mock` logs messages without sending, `api` sends for real |
-| `PHOTON_PROJECT_ID`, `PHOTON_PROJECT_API_KEY` | From the Photon dashboard |
-| `PHOTON_WEBHOOK_SECRET` | The `whsec_...` secret shown when you add the webhook |
+| `PATIENT_ADDRESS`, `CAREGIVER_ADDRESS` | test phone numbers, E.164 (`+1...`) |
+| `PARTICIPANT_OPT_IN` | must be `1` before anyone is messaged |
+| `DEMO_MODE` | `1` lets replayed or synthetic events text test numbers |
+| `EXPECTED_ACTIVE` | `0` for the demo: a quiet room alone never triggers a text |
+| `CHECKIN_TIMEOUT_S` | seconds before silence escalates to the caregiver (demo: 15) |
+| `PHOTON_MODE` | `mock` logs messages, `api` sends them |
+| `PHOTON_PROJECT_ID`, `PHOTON_PROJECT_API_KEY` | from the Photon dashboard |
+| `PHOTON_WEBHOOK_SECRET` | the `whsec_...` secret from the webhook destination |
 
-### Photon setup
-1. In the Photon dashboard, copy the **Project id** and create an **API key**.
-2. **iMessage > Add someone to the line** for both test phones. Each phone must text its assigned line once
-   before AuraCare can message it.
-3. Start a tunnel (`cloudflared tunnel --url http://127.0.0.1:8000`), then **Webhooks > Add a destination**
-   with `<tunnel url>/webhooks/photon` and all events. Save the signing secret to `.env`.
-4. Set `PHOTON_MODE=api` and restart the backend.
+**Photon in four steps**
+1. Dashboard: copy the **Project id**, create an **API key**.
+2. **iMessage > Add someone to the line** for both phones. Each phone texts its assigned line once.
+3. `cloudflared tunnel --url http://127.0.0.1:8000`, then **Webhooks > Add a destination** with
+   `<tunnel url>/webhooks/photon` and all events. Save the secret.
+4. `PHOTON_MODE=api`, restart the backend.
 
-The tunnel URL changes every time `cloudflared` restarts; update it in the Webhooks page when it does.
-
-## Running the demo
+## 8. Running the demo
 
 ```bash
-# 1. backend
+# terminal 1: backend
 uvicorn backend.main:app --host 127.0.0.1 --port 8000
 
-# 2. public URL for Photon replies
+# terminal 2: public URL for replies (update the Photon webhook if it changes)
 cloudflared tunnel --url http://127.0.0.1:8000
 
-# 3a. live: movement score from the boards (hub.py serves raw CSI on port 8770)
-python -m monitoring.csi_worker --hub ws://<hub laptop>:8770/v1/csi
-
-# 3b. no boards: replay our room recording in real time (labelled room_replay, demo mode only)
-python -m monitoring.csi_worker --replay <room dataset dir> --chunks p1_moving_1,p1_still_1
-
-# 3c. last-resort fallback: a labelled synthetic burst-then-stillness pattern
-python -m monitoring.csi_worker --synthetic
+# terminal 3, pick one
+python -m monitoring.csi_worker --hub ws://<hub laptop>:8770/v1/csi                          # live boards
+python -m monitoring.csi_worker --replay <room dataset> --chunks p1_moving_1,p1_still_1      # recorded room
+python -m monitoring.csi_worker --synthetic                                                  # labelled fallback
 ```
 
-The worker prints one line per second (`score 0.82 smoothed 0.81 MOVING`) and `EVENT ...` when the rules fire.
-Rehearse the demo motion on the real boards first.
+Live output, one line per second:
+```
+16:30:07 score 0.81 smoothed 0.81 MOVING
+16:30:09 score 0.38 smoothed 0.44 still
+16:30:12 score 0.13 smoothed 0.13 still
+16:30:18 score 0.06 smoothed 0.07 still
+  EVENT evt_2d4bd46da8 abrupt_motion_then_inactivity {'action': 'routine_checkin', ...}
+```
 
-## API
+Reproduce every number in this README:
+```bash
+python -m ml.data data/raw/WiFall data/clips.npz
+python -m ml.train_rf data/clips.npz --rate 50 && python -m ml.train_cnn && python -m ml.evaluate
+python -m ml.eval_auracare <room dataset>      # WiFall model in our room
+python -m ml.eval_room <room dataset>          # held-out room models
+python -m ml.room_motion train <room dataset>  # deployed movement model
+```
+
+## 9. API
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/ingest/observation` | One movement score (used by the worker) |
-| `POST` | `/ingest/ml` | Latest activity-model window (experimental) |
-| `GET` | `/sensors/{id}/health` | Is the feed fresh and ready |
-| `GET` | `/sensors/{id}/baseline` | Active detector thresholds |
-| `GET` | `/activity/history` | Recent movement scores |
-| `GET` | `/events`, `/events/{id}` | Events with evidence IDs and policy decision |
-| `GET` | `/events/{id}/checkin` | Check-in state and history |
-| `GET` | `/events/{id}/investigations` | Evidence reports |
-| `POST` | `/checkins`, `/investigate` | Policy-checked manual check-in, re-run investigation |
-| `POST` | `/webhooks/photon` | Signed inbound messages from Photon |
+| `POST` | `/ingest/observation` | one movement score (from the worker) |
+| `POST` | `/ingest/ml` | latest activity-model window (experimental) |
+| `GET` | `/sensors/{id}/health` | is the feed fresh and ready |
+| `GET` | `/sensors/{id}/baseline` | active detector thresholds |
+| `GET` | `/activity/history` | recent movement scores |
+| `GET` | `/events`, `/events/{id}` | events with evidence IDs and policy decision |
+| `GET` | `/events/{id}/checkin` | check-in state and timeline |
+| `GET` | `/events/{id}/investigations` | evidence reports |
+| `POST` | `/checkins`, `/investigate` | policy-checked manual check-in, re-run investigation |
+| `POST` | `/webhooks/photon` | signed inbound iMessage events |
 
-Interactive docs at `http://127.0.0.1:8000/docs` while the backend is running.
+Interactive docs at `http://127.0.0.1:8000/docs`.
 
-## Repository layout
+## 10. Repository map
 
 ```
-backend/         FastAPI app, settings, SQLite storage, service layer
+backend/         FastAPI app, settings, SQLite store, service layer
 monitoring/      csi_worker (live / replay / synthetic), temporal rules, policy, calibration
-sensors/         CSI layout mapping, timestamp-based windowing, sensor health
+sensors/         subcarrier mapping, layout checks, timestamp windowing, sensor health
 ml/              WiFall pipeline (RF, CNN, conformal), room dataset loader, room movement model, evaluations
-investigation/   evidence investigator and caregiver answers (no LLM)
+investigation/   evidence investigator and grounded caregiver answers
 photon/          Photon 2.0 client, webhook verification, check-in state machine, reply parser
-models/          trained room movement model, calibration, conformal threshold
-evaluation/      saved metrics from every evaluation above
+models/          room movement model, calibration, conformal threshold
+evaluation/      saved metrics behind every number above
 sim/             WiFall replay sensor
-tests/           24 tests for the rules above
+tests/           24 tests
 ```
 
-## Limitations and next steps
+## 11. Limitations and roadmap
 
-- **No real falls were recorded.** The alert rules are validated on recorded movement-to-stillness transitions
-  and on 28 prompted sit / stand / jump actions, not on falls.
-- **One room, one session.** Held-out numbers come from recordings made minutes apart, so they are likely
-  optimistic. A new room needs a short new recording and retraining.
-- **Two nodes, lossy links.** About a third of packets never arrive. More nodes or a cleaner channel would help.
-- **Next:** recordings across days and furniture changes; per-person routines instead of fixed thresholds;
-  the hub's presence and people-count estimates as context for the investigator; a caregiver dashboard.
+**Honest limits**
+- **No real falls were recorded.** The alert rule is validated on recorded movement-to-stillness transitions and
+  28 prompted sit / stand / jump actions, not on falls.
+- **One room, one session.** Held-out recordings were minutes apart, so the numbers are likely optimistic.
+  A new room needs a short recording and a retrain.
+- **Lossy radio.** A third of packets never arrive on two nodes.
 
-## Credits
+**Next**
+- multi-day recordings, furniture changes, more rooms
+- per-person routines instead of fixed thresholds
+- presence and people-count from the hub as investigator context
+- a caregiver dashboard over the event and check-in timeline
 
-- [WiFall](https://github.com/RS2002/WiFall) dataset for the public benchmark.
-- [RuView](https://github.com/ruvnet/RuView) ESP32 CSI firmware and sensing server.
-- [Photon](https://photon.codes) for iMessage messaging.
-- Open-source Python stack: NumPy, SciPy, scikit-learn, PyTorch, FastAPI.
+## 12. Credits
+
+- [WiFall](https://github.com/RS2002/WiFall): public CSI activity dataset used for the benchmark
+- [RuView](https://github.com/ruvnet/RuView): ESP32 CSI firmware and sensing server
+- [Photon](https://photon.codes): iMessage messaging API
+- NumPy, SciPy, scikit-learn, PyTorch, FastAPI, Uvicorn, pytest
