@@ -339,7 +339,7 @@ cloudflared tunnel --url http://127.0.0.1:8000
 
 # terminal 3, pick one
 python -m monitoring.csi_worker --hub ws://<hub laptop>:8770/v1/csi                          # live boards
-python -m monitoring.csi_worker --replay <room dataset> --chunks p1_moving_1,p1_still_1      # recorded room
+python -m monitoring.csi_worker --replay <room dataset> --chunks p1_moving_1,p1_still_1 --lead 15   # recorded room, alert in ~30 s
 python -m monitoring.csi_worker --synthetic                                                  # labelled fallback
 ```
 

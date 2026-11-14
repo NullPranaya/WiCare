@@ -1,6 +1,6 @@
 """Live loop: hub raw CSI -> room movement score (1 Hz) -> /ingest/observation -> temporal rules -> check-in.
   python -m monitoring.csi_worker --hub ws://127.0.0.1:8770/v1/csi          # live boards via hub.py
-  python -m monitoring.csi_worker --replay <dataset dir> --chunks p1_moving_1,p1_still_1   # recorded, real time
+  python -m monitoring.csi_worker --replay <dataset dir> --chunks p1_moving_1,p1_still_1 --lead 15   # recorded, ~30 s to alert
   python -m monitoring.csi_worker --synthetic                               # labelled demo fallback, no CSI
 Score = P(moving) from ml/room_motion.py on the last 3 s of nodes 2 and 3, then a rolling median of 3.
 Window end = newest packet time (hub clock), so laptop clocks need not agree. No valid window on both
@@ -42,10 +42,13 @@ def hub_packets(url):
         except Exception as e:
             print('hub disconnected:', e); time.sleep(2)
 
-def replay_packets(root, chunks):
-    for c in chunks:
+def replay_packets(root, chunks, lead=None):
+    """lead: play only the last `lead` seconds of the first chunk (shorter demo)."""
+    for i, c in enumerate(chunks):
         rows = [json.loads(l) for l in gzip.open(os.path.join(root, 'decoded', f'{c}.jsonl.gz'), 'rt')]
         rows.sort(key=lambda r: r['ts_unix'])
+        if i == 0 and lead:
+            rows = [r for r in rows if r['ts_unix'] >= rows[-1]['ts_unix'] - lead]
         print('replaying', c, len(rows), 'packets')
         shift, wall0 = time.time() - rows[0]['ts_unix'], time.time()
         for r in rows:
@@ -86,9 +89,10 @@ if __name__ == '__main__':
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument('--hub'); g.add_argument('--replay'); g.add_argument('--synthetic', action='store_true')
     ap.add_argument('--chunks', default='p1_moving_1,p1_still_1')
+    ap.add_argument('--lead', type=float, default=None, help='replay: seconds of the first chunk to play (demo: 15)')
     ap.add_argument('--api', default='http://127.0.0.1:8000')
     ap.add_argument('--sensor', default=os.getenv('SENSOR_ID', 'esp32_01'))
     a = ap.parse_args()
     if a.synthetic: synthetic(a.api, a.sensor)
     elif a.hub: run(hub_packets(a.hub), a.api, a.sensor, 'live_csi')
-    else: run(replay_packets(a.replay, a.chunks.split(',')), a.api, a.sensor, 'room_replay')
+    else: run(replay_packets(a.replay, a.chunks.split(','), a.lead), a.api, a.sensor, 'room_replay')
