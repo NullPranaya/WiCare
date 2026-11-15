@@ -130,9 +130,11 @@ function render() {
     alarm.hidden = false;
     $("ack").focus();
     alarmSound.start();
+    setTabAlarm(true);
   } else if (!showAlarm && !alarm.hidden) {
     alarm.hidden = true;
     alarmSound.stop();
+    setTabAlarm(false);
   }
   if (showAlarm) {
     $("alarm-detail").textContent =
@@ -140,6 +142,14 @@ function render() {
     $("alarm-message").textContent = alertText();
     $("alarm-sound").hidden = !alarmSound.blocked();
   }
+}
+
+// ---------- tab icon and title ----------
+// Turns the favicon red and retitles the tab, so a nurse in another tab sees the fall.
+const calmTitle = document.title;
+function setTabAlarm(on) {
+  $("favicon").href = on ? "/static/favicon-alarm.svg" : "/static/favicon.svg";
+  document.title = on ? "Possible fall · " + calmTitle : calmTitle;
 }
 
 // ---------- alarm sound ----------
