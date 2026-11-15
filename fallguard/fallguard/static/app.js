@@ -74,11 +74,6 @@ function burstStart() {
 }
 
 // ---------- rendering ----------
-function setRule(el, text, mark) {
-  el.textContent = text;
-  el.className = mark || "";
-}
-
 function render() {
   const s = app.state;
   const now = serverNow();
@@ -95,8 +90,6 @@ function render() {
 
   const limit = app.config.burst_max_s;
   const need = app.config.still_s;
-  const burstRule = $("rule-burst");
-  const stillRule = $("rule-still");
   const elapsed = Math.max(0, now - s.since);
 
   switch (s.state) {
@@ -104,43 +97,31 @@ function render() {
       const so = Math.max(0, now - (burstStart() ?? s.since));
       word.textContent = "Sudden movement";
       note.textContent = `${fmt(so)} s so far. A fall pattern needs it to stop within ${limit} s.`;
-      setRule(burstRule, `Sudden movement: ${fmt(so)} s so far (limit ${limit} s)`);
-      setRule(stillRule, "Stillness after it: waiting");
       break;
     }
     case "STILLNESS": {
       const n = Math.min(need, Math.floor(elapsed));
       word.textContent = `Stillness ${n} of ${need} s`;
       note.textContent = `After a ${fmt(s.burst_s)} s sudden movement. Any movement now cancels the alert.`;
-      setRule(burstRule, `Sudden movement: ${fmt(s.burst_s)} s (limit ${limit} s)`, "ok");
-      setRule(stillRule, `Stillness after it: ${n} of ${need} s`);
       break;
     }
     case "FALL":
       word.textContent = "Possible fall";
       note.textContent = "Waiting for someone to acknowledge.";
-      setRule(burstRule, `Sudden movement: ${fmt(s.burst_s)} s (limit ${limit} s)`, "ok");
-      setRule(stillRule, `Stillness after it: ${need} of ${need} s`, "ok");
       break;
     case "MOVEMENT":
       word.textContent = "Moving";
       note.textContent = "Ongoing movement. This is not the fall pattern.";
-      setRule(burstRule, "Sudden movement: lasted too long or kept going", "bad");
-      setRule(stillRule, "Stillness after it: waiting");
       break;
     case "NO_SIGNAL":
       word.textContent = "No signal";
       note.textContent = "No data from the Wi-Fi sensor for over 1.5 s. Check the board and the hotspot.";
-      setRule(burstRule, "Sudden movement: waiting");
-      setRule(stillRule, "Stillness after it: waiting");
       break;
     default:
       word.textContent = s.armed ? "Monitoring" : "Alerts paused";
       note.textContent = s.armed
         ? "Watching for a sudden movement followed by stillness."
         : "Turn on “Patient in bed” to resume fall alerts.";
-      setRule(burstRule, "Sudden movement: waiting");
-      setRule(stillRule, "Stillness after it: waiting");
   }
 
   const alarm = $("alarm");
@@ -356,7 +337,6 @@ function onMessage(msg) {
     }
     case "alert":
       app.alert = msg;
-      $("alert-text").textContent = alertText();
       render();
       break;
     case "route":
@@ -393,13 +373,6 @@ async function post(path, body) {
 $("ack").addEventListener("click", () => post("/api/ack").then(onState).catch(console.error));
 $("armed").addEventListener("change", (e) => post("/api/arm", { armed: e.target.checked }).then(onState).catch(console.error));
 
-function mark(label, text) {
-  post("/api/mark", { label })
-    .then((r) => { $("mark-note").textContent = `Saved “${text}” at ${r.wall.slice(11)}`; })
-    .catch(() => { $("mark-note").textContent = "Could not save the label. Is the app running?"; });
-}
-$("mark-fall").addEventListener("click", () => mark("fall", "fall"));
-$("mark-false").addEventListener("click", () => mark("false_alarm", "false alarm"));
 
 connect();
 requestAnimationFrame(draw);

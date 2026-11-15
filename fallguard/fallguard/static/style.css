@@ -50,25 +50,21 @@ main { padding: 1.5rem 2rem 2rem; max-width: 1400px; margin: 0 auto; }
 #chart { display: block; width: 100%; height: clamp(220px, 38vh, 420px); }
 .axis { display: flex; justify-content: space-between; color: var(--quiet); font-size: .9rem; padding-top: .25rem; }
 
-.facts { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 2rem; margin-top: 1.5rem; }
+.facts { display: flex; justify-content: center; margin-top: 1.5rem; text-align: center; }
 .fact h2 { font-size: 1rem; font-weight: 700; color: var(--quiet); margin-bottom: .5rem; }
 .fact p { font-size: 1.15rem; line-height: 1.5; }
-.ok::before { content: "✓ "; color: var(--trace); font-weight: 700; }
-.bad::before { content: "✗ "; color: var(--fall); font-weight: 700; }
 
 .boards { list-style: none; margin: 0; padding: 0; font-size: 1.1rem; line-height: 1.6; }
 .dot { display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; background: var(--fall); margin-right: .45rem; }
 .dot.on { background: var(--trace); }
 .boards .meta { color: var(--quiet); }
 
-.actions { display: flex; gap: .75rem; align-items: center; margin-top: 1.75rem; flex-wrap: wrap; }
 button {
   font: inherit; font-size: 1.05rem; padding: .6rem 1.1rem; border-radius: 6px;
   border: 1px solid var(--ink); background: var(--sheet); color: var(--ink); cursor: pointer;
 }
 button:hover { background: #fff; }
 :focus-visible { outline: 3px solid var(--trace); outline-offset: 2px; }
-.mark-note { color: var(--quiet); }
 
 .replay-banner, .link-banner { padding: .5rem 2rem; font-weight: 700; color: #fff; }
 .replay-banner { background: var(--quiet); }
@@ -98,7 +94,6 @@ button:hover { background: #fff; }
 @media (max-width: 800px) {
   .top, main { padding-left: 1rem; padding-right: 1rem; }
   .steps { margin: 0; flex-wrap: wrap; }
-  .facts { grid-template-columns: 1fr; gap: 1.25rem; }
 }
 
 .back { margin-left: auto; font-size: 1.05rem; color: var(--ink); }
