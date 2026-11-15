@@ -10,6 +10,8 @@
  * physiologically accurate vital signs, and realistic behavioral patterns.
  */
 
+import { WAKE_BED } from './pose-system.js';
+
 const SCENARIOS = [
   'empty_room',
   'single_breathing',
@@ -23,9 +25,37 @@ const SCENARIOS = [
   'elderly_care',
   'fitness_tracking',
   'security_patrol',
+  'wake_up',
 ];
 
 const CROSSFADE_DURATION = 2; // seconds
+
+// AuraCare wake-up story timing (seconds)
+const WAKE = {
+  sit: 5, stand: 11, walk: 15, loop: 36,
+  // walking loop in front of the bed (bed spans x -2.6..-0.4, z -3.1..-1.9), starting and ending at the bedside
+  path: [[-1.45, -1.5], [0.5, 0.2], [2.2, 1.5], [0.5, 2.5], [-1.8, 0.8], [-1.45, -1.5]],
+};
+
+/** Point at fraction u (0..1) along a polyline, plus the facing angle that points the figure (front = -z) along it. */
+function _pathPoint(path, u) {
+  const seg = [];
+  let total = 0;
+  for (let i = 1; i < path.length; i++) {
+    const d = Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+    seg.push(d); total += d;
+  }
+  let s = Math.max(0, Math.min(1, u)) * total;
+  for (let i = 0; i < seg.length; i++) {
+    if (s <= seg[i] || i === seg.length - 1) {
+      const f = seg[i] ? Math.min(1, s / seg[i]) : 0;
+      const [ax, az] = path[i], [bx, bz] = path[i + 1];
+      return [ax + (bx - ax) * f, az + (bz - az) * f, Math.atan2(bx - ax, -(bz - az))];
+    }
+    s -= seg[i];
+  }
+  return [path[0][0], path[0][1], 0];
+}
 
 // ---------------------------------------------------------------------------
 // Noise & utility functions (module-private)
@@ -203,6 +233,7 @@ export class DemoDataGenerator {
       case 'elderly_care':     return this._elderlyCare(t);
       case 'fitness_tracking': return this._fitnessTracking(t);
       case 'security_patrol':  return this._securityPatrol(t);
+      case 'wake_up':          return this._wakeUp(t);
       default:                 return this._emptyRoom(t);
     }
   }
@@ -561,6 +592,63 @@ export class DemoDataGenerator {
           shock_hr_bpm: postFall ? hrRate.toFixed(0) : null,
         },
       },
+    });
+  }
+
+  // ========================================================================
+  // AuraCare: waking up. 0-5 s lying in bed, 5 s sits up halfway, 11 s gets up fully, 15 s starts walking.
+  // ========================================================================
+
+  _wakeUp(t) {
+    const n = _getNoiseBank('wake_up');
+    t = t % WAKE.loop;
+    let wake = 0, ms = 2, pose = 'waking', activity = 'Lying in bed', px = 3.55 + WAKE_BED.dx, pz = -2.5 + WAKE_BED.dz, facing = 0;
+    if (t < WAKE.sit) {
+      wake = 0;
+    } else if (t < WAKE.stand) {
+      wake = _smoothstep(WAKE.sit, WAKE.sit + 1.8, t);
+      ms = wake < 1 ? 45 : 6;
+      activity = wake < 1 ? 'Sitting up in bed' : 'Sitting up in bed, awake';
+    } else if (t < WAKE.walk) {
+      const e = t - WAKE.stand;                          // 4 s: legs over the edge, then stand
+      wake = 1 + _smoothstep(0, 1.4, e) + _smoothstep(1.6, 3.0, e);
+      ms = wake < 3 ? 55 : 12;
+      activity = wake < 2 ? 'Getting out of bed' : wake < 3 ? 'Standing up' : 'Standing beside the bed';
+    } else {
+      // walk a loop through the room and back to the bedside
+      const path = WAKE.path, u = (t - WAKE.walk) / (WAKE.loop - WAKE.walk);
+      const [a, b, k] = _pathPoint(path, u);
+      px = a; pz = b; facing = k;
+      pose = 'walking'; ms = 70 + n.motion(t) * 6; activity = 'Walking around the room';
+    }
+    const walking = pose === 'walking';
+    const breathRate = (walking ? 17 : wake >= 1 ? 15 : 12) + n.breath(t) * 0.5;
+    const hr = (walking ? 80 : wake >= 1 ? 70 : 60) + n.hr(t);
+    const level = ms / 100;
+
+    const amplitude = new Float32Array(64);
+    for (let i = 0; i < 64; i++) {
+      amplitude[i] = 0.28 + level * 0.18 * Math.sin(t * 0.9 + i * 0.12) + _harmonicNoise(t, i * 0.11, 2) * 0.006;
+    }
+    // body centre for the glow: on the mattress while in bed, beside it once up
+    const inBed = pose === 'waking' && wake < 1.5;
+    const pos = inBed ? [3.4 + WAKE_BED.dx, 0.5, -3.5 + WAKE_BED.dz] : [px, 0, pz];
+    return this._baseFrame({
+      nodes: [{ node_id: 1, rssi_dbm: -43 + n.rssi(t) * 0.4, position: [2, 0, 1.5], amplitude, subcarrier_count: 64 }],
+      features: {
+        mean_rssi: -43 + n.rssi(t) * 0.4,
+        variance: 0.6 + level * 3,
+        std: 0.77 + level,
+        motion_band_power: level,
+        breathing_band_power: 0.1,
+        dominant_freq_hz: breathRate / 60,
+        spectral_power: 0.08,
+      },
+      classification: { motion_level: level > 0.2 ? 'active' : 'present_still', presence: true, confidence: 0.92 },
+      signal_field: { grid_size: [20, 1, 20], values: this._presenceField(Math.round(pos[0] * 1.6 + 10), Math.round(pos[2] * 1.6 + 10), 1.8 + level * 2, t) },
+      vital_signs: { breathing_rate_bpm: breathRate, heart_rate_bpm: hr, breathing_confidence: 0.85, heart_rate_confidence: 0.8 },
+      persons: [{ id: 'p0', position: pos, motion_score: _clamp(ms, 1, 120), pose, wake, facing, activity }],
+      estimated_persons: 1,
     });
   }
 

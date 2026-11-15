@@ -12,10 +12,13 @@
 import { PoseSystem } from './pose-system.js';
 import { dotChart } from './aura-viz.js';
 
-const STORY = [
-  { scenario: 'elderly_care', dur: 26 },
-  { scenario: 'fall_event', dur: 34 },
-];
+// default story: waking up (bed, sit up at 5 s, get up at 11 s, walk at 15 s), everything OK.
+// ?scene=fall plays the older fall story instead.
+const SCENE = new URLSearchParams(location.search).get('scene');
+const STORY = SCENE === 'fall'
+  ? [{ scenario: 'elderly_care', dur: 26 }, { scenario: 'fall_event', dur: 34 }]
+  : [{ scenario: 'wake_up', dur: 36 }];
+const IDLE_SCENE = SCENE === 'fall' ? 'elderly_care' : 'wake_up';
 // seconds after the fall pose appears (demo pacing only)
 const T_CHECKIN = 4, T_REPLY = 10, T_CAREGIVER = 11;
 const API = new URLSearchParams(location.search).get('api') || `http://${location.hostname || 'localhost'}:8000`;
@@ -38,9 +41,11 @@ export class AuraCare {
     this.hist = []; this.histT = 1;
     this.care = null; this._okAt = 0; this._scene = null; this._eventId = null; this._msgKey = '';
     // ?scene=fall starts the demo story at the fall (handy on stage)
-    const scene = new URLSearchParams(location.search).get('scene');
-    this.i = scene === 'fall' ? 0 : -1;
+    this.i = SCENE === 'fall' ? 0 : -1;
     this._next();
+    // ?t=<seconds> jumps into the story (rehearsal): e.g. ?t=14 starts just before the walk
+    const t0 = parseFloat(new URLSearchParams(location.search).get('t'));
+    if (t0 > 0) { this.t = t0; this.obs._demoData._elapsed = t0; }
     this._poll();
   }
 
@@ -65,7 +70,7 @@ export class AuraCare {
     this._msgKey = '';
     if (!on) { $('aura-chat-body').textContent = ''; const e = document.createElement('div'); e.className = 'aura-empty';
       e.textContent = 'Demo story: no real messages are sent.'; $('aura-chat-body').appendChild(e); this._text('aura-chat-meta', ''); }
-    if (on) { this._setScene('elderly_care'); this._eventId = null; }
+    if (on) { this._setScene(IDLE_SCENE); this._eventId = null; }
     else { this._last.key = null; this.i = -1; this._next(); }
     const lbl = $('data-source-label');
     if (lbl && on) lbl.textContent = '3D VIEW SIMULATED';
@@ -79,7 +84,7 @@ export class AuraCare {
     if (this.t > STORY[this.i].dur) return this._next();
     const pose = data && data.persons && data.persons[0] && data.persons[0].pose;
     if (!this.ev && (pose === 'falling' || pose === 'fallen')) this.ev = { t0: this.t, at: new Date() };
-    if (!this.ev) return this._render({ status: 'ok', label: 'Monitoring', step: 0 });
+    if (!this.ev) return this._render({ status: 'ok', label: SCENE === 'fall' ? 'Monitoring' : 'All good', step: 0 });
     const e = this.t - this.ev.t0;
     const step = e < T_CHECKIN ? 1 : e < T_REPLY ? 2 : e < T_CAREGIVER ? 3 : 4;
     this._render({
@@ -99,7 +104,7 @@ export class AuraCare {
     this._text('aura-bpm', bpm > 0 ? `${Math.round(bpm)} / min` : '--');
     this._text('aura-people', String(n));
     this._text('aura-sensor', 'simulated');
-    this._text('aura-sentence', !n ? 'Nobody in the room' : POSE_WORDS[p && p.pose] || 'Moving');
+    this._text('aura-sentence', !n ? 'Nobody in the room' : (p && p.activity) || POSE_WORDS[p && p.pose] || 'Moving');
     const m = p ? Math.min(1, (p.motion_score || 0) / 255) : 0;
     this.histT += dt;
     if (this.histT >= 1) {
@@ -119,7 +124,7 @@ export class AuraCare {
     this.t = 0;
     this.ev = null;
     this._setScene(STORY[this.i].scenario);
-    this._render({ status: 'ok', label: 'Monitoring', step: 0 });
+    this._render({ status: 'ok', label: SCENE === 'fall' ? 'Monitoring' : 'All good', step: 0 });
   }
 
   _setScene(name) {
@@ -139,7 +144,7 @@ export class AuraCare {
     const ev = c.event;
     // 3D view: a visualisation of the event, switched by real events only
     if (ev && ev.id !== this._eventId) { this._eventId = ev.id; this._setScene('fall_event'); }
-    if (!ev && this._eventId) { this._eventId = null; this._setScene('elderly_care'); }
+    if (!ev && this._eventId) { this._eventId = null; this._setScene(IDLE_SCENE); }
 
     let reply = c.reply || 'Reply';
     const left = c.checkin && c.checkin.seconds_left;

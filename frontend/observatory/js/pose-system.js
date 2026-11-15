@@ -10,6 +10,9 @@
  * Every public method is a pure function: parameters in, keypoint array out.
  */
 
+// AuraCare wake-up scene: the bed is moved by this much (RuView's bed sits behind the right panel)
+export const WAKE_BED = { dx: -5, dz: 1 };
+
 export class PoseSystem {
   static frail = false;   // AuraCare sets true
 
@@ -34,6 +37,7 @@ export class PoseSystem {
       case 'gesturing':   kps = this.poseGesturing(px, pz, elapsed, person.gestureType, person.gestureIntensity || 0); break;
       case 'crouching':   kps = this.poseCrouching(px, pz, elapsed, bp); break;
       case 'walking':     kps = this.poseWalking(px, pz, elapsed, ms, bp); break;
+      case 'waking':      kps = this.poseWaking(person.wake || 0, elapsed, bp); break;
       case 'standing':
       default:            kps = this.poseStanding(px, pz, elapsed, ms, bp); break;
     }
@@ -57,6 +61,58 @@ export class PoseSystem {
                     5: [-0.06, -0.04], 6: [-0.06, -0.04], 7: [-0.05, -0.03], 8: [-0.05, -0.03],
                     9: [-0.06, -0.02], 10: [-0.06, -0.02], 13: [-0.03, -0.02], 14: [-0.03, -0.02] };
     for (const i in shift) { kps[i][2] += shift[i][0] * k; kps[i][1] += shift[i][1] * k; }
+  }
+
+  // ---- AuraCare: getting out of bed --------------------------------------
+  // wake 0 = lying on the bed, 1 = sitting up in bed, 2 = sitting on the bed edge, 3 = standing beside it.
+  // Fractions blend between neighbouring key poses. World coordinates (bed centre 3.5, -3.5; mattress top 0.53).
+
+  poseWaking(wake, elapsed, bp) {
+    const keys = PoseSystem._wakeKeys || (PoseSystem._wakeKeys = this._buildWakeKeys());
+    const w = Math.max(0, Math.min(3, wake));
+    const i = Math.min(2, Math.floor(w)), f = w - i;
+    const e = f * f * (3 - 2 * f);
+    const a = i === 2 ? keys[2] : keys[i], b = i === 2 ? this._wakeStanding(elapsed, bp) : keys[i + 1];
+    if (w >= 3) return this._wakeStanding(elapsed, bp);
+    const out = a.map((p, k) => [p[0] + (b[k][0] - p[0]) * e, p[1] + (b[k][1] - p[1]) * e, p[2] + (b[k][2] - p[2]) * e]);
+    // breathing in the chest while in bed
+    const chest = bp * 0.012 * (1 - w / 3);
+    for (const k of [5, 6, 11, 12]) out[k][1] += chest;
+    return out;
+  }
+
+  _wakeStanding(elapsed, bp) {
+    const x = 3.55 + WAKE_BED.dx, z = -2.5 + WAKE_BED.dz;
+    const kps = this.poseStanding(x, z, elapsed, 0, bp);
+    if (PoseSystem.frail) this.stoop(kps, 1);
+    this.rotateKps(kps, x, z, Math.PI);            // face the room (+z), back to the bed
+    return kps;
+  }
+
+  _buildWakeKeys() {
+    const Z = -3.5, X = 3.55;
+    // lying on the back, head on the pillow (-x), left side = -z
+    const lying = [
+      [2.75, 0.73, Z], [2.78, 0.75, Z - 0.03], [2.78, 0.75, Z + 0.03], [2.72, 0.73, Z - 0.07], [2.72, 0.73, Z + 0.07],
+      [3.05, 0.65, Z - 0.18], [3.05, 0.65, Z + 0.18], [3.10, 0.63, Z - 0.34], [3.10, 0.63, Z + 0.34],
+      [3.32, 0.61, Z - 0.37], [3.32, 0.61, Z + 0.37], [X, 0.65, Z - 0.10], [X, 0.65, Z + 0.10],
+      [3.95, 0.63, Z - 0.11], [3.95, 0.63, Z + 0.11], [4.32, 0.61, Z - 0.10], [4.32, 0.61, Z + 0.10],
+    ];
+    // sitting up in bed, legs still under the sheet, facing the foot of the bed (+x)
+    const sitUp = [
+      [3.62, 1.36, Z], [3.60, 1.38, Z - 0.03], [3.60, 1.38, Z + 0.03], [3.52, 1.36, Z - 0.07], [3.52, 1.36, Z + 0.07],
+      [3.50, 1.11, Z - 0.19], [3.50, 1.11, Z + 0.19], [3.58, 0.88, Z - 0.25], [3.58, 0.88, Z + 0.25],
+      [3.78, 0.72, Z - 0.17], [3.78, 0.72, Z + 0.17], [X, 0.65, Z - 0.10], [X, 0.65, Z + 0.10],
+      [3.95, 0.66, Z - 0.11], [3.95, 0.66, Z + 0.11], [4.32, 0.61, Z - 0.10], [4.32, 0.61, Z + 0.10],
+    ];
+    // legs swung over the edge (z = -2.9), feet on the floor, facing the room (+z), left side = +x
+    const edge = [
+      [X, 1.34, -3.00], [X + 0.03, 1.36, -3.02], [X - 0.03, 1.36, -3.02], [X + 0.07, 1.34, -3.10], [X - 0.07, 1.34, -3.10],
+      [X + 0.20, 1.09, -3.12], [X - 0.20, 1.09, -3.12], [X + 0.25, 0.85, -3.02], [X - 0.25, 0.85, -3.02],
+      [X + 0.20, 0.64, -2.86], [X - 0.20, 0.64, -2.86], [X + 0.11, 0.61, -3.06], [X - 0.11, 0.61, -3.06],
+      [X + 0.12, 0.59, -2.68], [X - 0.12, 0.59, -2.68], [X + 0.12, 0.04, -2.62], [X - 0.12, 0.04, -2.62],
+    ];
+    return [lying, sitUp, edge].map((key) => key.map(([x, y, z]) => [x + WAKE_BED.dx, y, z + WAKE_BED.dz]));
   }
 
   // ---- Rotation utility --------------------------------------------------

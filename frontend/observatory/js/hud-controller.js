@@ -80,6 +80,7 @@ const SCENARIO_DESCRIPTIONS = {
   elderly_care:      'Continuous gait analysis for early mobility-decline detection.',
   fitness_tracking:  'Rep counting and exercise classification from body kinematics.',
   security_patrol:   'Multi-zone presence patrol with camera-free motion heatmaps.',
+  wake_up:           'Waking up: lying in bed, sitting up, getting up, walking.',
 };
 
 // Edge modules active per scenario
@@ -97,6 +98,7 @@ const SCENARIO_EDGE_MODULES = {
   elderly_care:      ['GAIT', 'VITALS', 'FALL'],
   fitness_tracking:  ['GESTURE', 'GAIT'],
   security_patrol:   ['PRESENCE', 'ALERT', 'TRACKING'],
+  wake_up:           ['VITALS', 'GAIT'],
 };
 
 // Edge-module badge colors

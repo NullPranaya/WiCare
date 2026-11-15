@@ -582,7 +582,7 @@ class Observatory {
     const px = pp[0] || 0, pz = pp[2] || 0;
     const ms = persons[0].motion_score || 0;
     const pose = persons[0].pose || 'standing';
-    const isLying = pose === 'lying' || pose === 'fallen';
+    const isLying = pose === 'lying' || pose === 'fallen' || (pose === 'waking' && (persons[0].wake || 0) < 1.5);
     const bodyH = isLying ? 0.4 : 1.7;
     const bodyBaseY = isLying ? (pp[1] || 0) + 0.05 : 0.05;
     const spread = ms > 50 ? 0.6 : 0.4;

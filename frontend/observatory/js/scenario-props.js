@@ -7,6 +7,7 @@
  * and the alert light system.
  */
 import * as THREE from 'three';
+import { WAKE_BED } from './pose-system.js';
 
 // Scenario-to-prop-name mapping
 const SCENARIO_PROPS = {
@@ -15,6 +16,7 @@ const SCENARIO_PROPS = {
   two_walking:      [],
   fall_event:       [],
   sleep_monitoring: ['bed'],
+  wake_up:          ['bed'],
   intrusion_detect: ['door'],
   gesture_control:  ['screen'],
   crowd_occupancy:  ['desk', 'desk2'],
@@ -657,6 +659,11 @@ export class ScenarioProps {
       const propsToShow = SCENARIO_PROPS[scenario] || [];
       for (const name of propsToShow) {
         if (this._props[name]) this._props[name].visible = true;
+      }
+      // AuraCare wake-up scene uses the same bed, moved into view
+      if (this._props.bed) {
+        const w = scenario === 'wake_up';
+        this._props.bed.position.set(w ? WAKE_BED.dx : 0, 0, w ? WAKE_BED.dz : 0);
       }
     }
 

@@ -9,12 +9,14 @@ from monitoring.burst_rule import BurstDetector, BurstRule
 from photon.client import PhotonClient
 from photon import checkins
 from sensors.health import sensor_health
+from backend.ward import Ward
 
 class Service:
     def __init__(self, settings=None, db=None):
         self.s = settings or default_settings
         self.db = db or DB(self.s.db_path)
         self.photon = PhotonClient(self.db, self.s)
+        self.ward = Ward(self.photon, self.db)      # 5-room stress demo (backend/ward.py)
         if getattr(self.s, 'detector', 'score') == 'burst':
             rule = BurstRule(threshold=self.s.burst_threshold, burst_max_s=self.s.burst_max_s, still_s=self.s.burst_still_s)
             self.calibration = dict(thresholds=dict(high=rule.threshold, low=rule.threshold, still_s=rule.still_s,

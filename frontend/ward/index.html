@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AuraCare Room</title>
+  <link rel="stylesheet" href="ward.css">
+</head>
+<body data-mode="ward">
+  <canvas id="scene"></canvas>
+
+  <header class="bar">
+    <div class="brand"><b>aura</b><i>care</i><span class="ward-name" id="ward-name">Room 1 · private room</span></div>
+    <div class="bar-right">
+      <div class="pill" id="pill" data-s="ok"><span class="dot"></span><span id="pill-text">All rooms calm</span></div>
+      <span class="clock" id="clock">--:--</span>
+    </div>
+  </header>
+
+  <!-- nurse was asked on iMessage -->
+  <div class="toast" id="toast" hidden>
+    <div class="toast-icon">!</div>
+    <div class="toast-body">
+      <div class="toast-title" id="toast-title">Stress is high</div>
+      <div class="toast-sub" id="toast-sub">Nurse asked on iMessage: check on them? Waiting for a reply.</div>
+    </div>
+    <button class="btn" id="open-now">Open room</button>
+  </div>
+
+  <!-- five stress monitors -->
+  <section class="monitors" id="monitors"></section>
+
+  <!-- opened room (only after the nurse says 1) -->
+  <aside class="detail" id="detail" hidden>
+    <div class="detail-head">
+      <div>
+        <div class="detail-kicker" id="room-kicker">Room · opened by the nurse</div>
+        <div class="detail-title" id="activity">Lying in bed</div>
+      </div>
+      <button class="btn ghost" id="back">Close room</button>
+    </div>
+    <div class="big-monitor">
+      <div class="bm-top"><span>Stress</span><span class="bm-val" id="bm-val">--</span></div>
+      <canvas id="bm-chart" width="640" height="200"></canvas>
+      <div class="bm-foot"><span id="bm-level">--</span><span>alert at 70</span></div>
+    </div>
+    <div class="timeline" id="timeline">
+      <div data-k="0"><b>0s</b>Lying in bed</div>
+      <div data-k="1"><b>5s</b>Sits up</div>
+      <div data-k="2"><b>11s</b>Gets up</div>
+      <div data-k="3"><b>15s</b>Walking</div>
+    </div>
+    <div class="chat">
+      <div class="chat-head">iMessage · nurse</div>
+      <div class="chat-body" id="chat"></div>
+    </div>
+  </aside>
+
+  <div class="foot-note" id="note">Rooms stay closed for privacy until the nurse replies 1 · demo index, not a clinical measure</div>
+
+  <script type="importmap">
+  { "imports": { "three": "../vendor/three/build/three.module.js", "three/addons/": "../vendor/three/examples/jsm/" } }
+  </script>
+  <script type="module" src="ward.js"></script>
+</body>
+</html>
