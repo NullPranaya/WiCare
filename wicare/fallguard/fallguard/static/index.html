@@ -7,6 +7,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+  <link id="favicon" rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#0E7A80">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -14,7 +18,8 @@
   <div id="link-banner" class="link-banner" hidden>Disconnected from the WiCare app. Reconnecting…</div>
 
   <header class="top">
-    <h1>WiCare <span class="room">Bed 1</span></h1>
+    <a class="crumb" href="/ward"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>All rooms</a>
+    <h1 class="brand"><img class="logo" src="/static/logo.svg" alt="">WiCare <span class="room">Bed 1</span></h1>
     <ol class="steps" aria-label="Fall rule progress">
       <li data-step="MONITORING">Monitoring</li>
       <li data-step="BURST">Sudden movement</li>
@@ -48,6 +53,7 @@
 
   <div id="alarm" class="alarm" hidden role="alertdialog" aria-labelledby="alarm-title">
     <div class="alarm-body">
+      <img class="alarm-mark" src="/static/alarm-mark.svg" alt="">
       <p id="alarm-title" class="alarm-title">Possible fall</p>
       <p id="alarm-detail" class="alarm-detail"></p>
       <p id="alarm-message" class="alarm-message"></p>

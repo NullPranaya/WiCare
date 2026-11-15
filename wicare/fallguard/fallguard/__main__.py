@@ -67,6 +67,7 @@ def main() -> None:
     port = args.port or config.port
     shown = lan_address() if config.host in ("0.0.0.0", "") else config.host
     print(f"WiCare dashboard: http://{shown}:{port}/", flush=True)
+    print(f"All rooms: http://{shown}:{port}/ward", flush=True)
     uvicorn.run(app, host=config.host, port=port, log_level="warning")
 
 
