@@ -1,6 +1,3 @@
-"""Deterministic event investigator (no LLM, free, no hallucination). Gathers the same evidence a caregiver
-would ask for, computes signal-quality checks, and writes an evidence-linked report. Every statement is
-generated from stored numbers and cites the IDs it came from. It never sends messages or changes policy."""
 import json
 import numpy as np
 from backend.db import new_id, now, iso
