@@ -1,0 +1,4 @@
+# RuView Observatory (MIT, copied in for the 3D view) and vendored three.js: third-party, not counted in GitHub language stats
+frontend/observatory/** linguist-vendored
+frontend/services/** linguist-vendored
+frontend/vendor/** linguist-vendored
