@@ -82,6 +82,8 @@ button:hover { background: #fff; }
 .alarm-title { font-size: clamp(4.5rem, 12vw, 9rem); font-weight: 700; line-height: 1; }
 .alarm-detail { font-size: clamp(1.4rem, 2.8vw, 2.2rem); margin-top: 1.25rem; }
 .alarm-message { font-size: 1.3rem; margin-top: .75rem; opacity: .9; }
+.alarm-sound { font-size: 1.1rem; margin-top: .75rem; font-weight: 700; }
+.alarm-sound[hidden] { display: none; }
 .ack {
   margin-top: 2.5rem; font-size: 1.6rem; padding: .9rem 2.4rem;
   background: #fff; color: var(--fall); border-color: #fff; font-weight: 700;

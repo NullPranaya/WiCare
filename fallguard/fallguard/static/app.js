@@ -148,14 +148,81 @@ function render() {
   if (showAlarm && alarm.hidden) {
     alarm.hidden = false;
     $("ack").focus();
-  } else if (!showAlarm) {
+    alarmSound.start();
+  } else if (!showAlarm && !alarm.hidden) {
     alarm.hidden = true;
+    alarmSound.stop();
   }
   if (showAlarm) {
     $("alarm-detail").textContent =
       `Sudden movement for ${fmt(s.burst_s)} s, then still for ${need} s.`;
     $("alarm-message").textContent = alertText();
+    $("alarm-sound").hidden = !alarmSound.blocked();
   }
+}
+
+// ---------- alarm sound ----------
+// Synthesized with Web Audio, so there is no file to load. Browsers only allow sound after someone
+// has clicked or pressed a key on the page; until then the alarm shows a hint instead.
+const alarmSound = (() => {
+  const PATTERN_S = 1.6; // three rising beeps, then a pause
+  const NOTES = [660, 880, 1100];
+  let ctx = null;
+  let timer = null;
+
+  function context() {
+    if (!ctx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      ctx = new Ctx();
+    }
+    return ctx;
+  }
+
+  function beep(c, at, freq) {
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = "square";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.exponentialRampToValueAtTime(0.18, at + 0.02);
+    gain.gain.setValueAtTime(0.18, at + 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.2);
+    osc.connect(gain).connect(c.destination);
+    osc.start(at);
+    osc.stop(at + 0.22);
+  }
+
+  function pattern() {
+    const c = context();
+    if (!c || c.state !== "running") return; // never queue beeps that would all fire at once later
+    const t = c.currentTime + 0.05;
+    NOTES.forEach((freq, i) => beep(c, t + i * 0.25, freq));
+  }
+
+  function unlock() {
+    const c = context();
+    if (c && c.state !== "running") c.resume().then(() => { if (timer) pattern(); }).catch(() => {});
+  }
+
+  return {
+    unlock,
+    start() {
+      if (timer) return;
+      unlock();
+      pattern();
+      timer = setInterval(pattern, PATTERN_S * 1000);
+    },
+    stop() {
+      clearInterval(timer);
+      timer = null;
+    },
+    blocked: () => !ctx || ctx.state !== "running",
+  };
+})();
+
+for (const kind of ["pointerdown", "keydown"]) {
+  document.addEventListener(kind, () => alarmSound.unlock(), { capture: true });
 }
 
 function alertText() {
