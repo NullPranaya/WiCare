@@ -87,11 +87,12 @@ class Observation(BaseModel):
     score: float
     motion: bool | None = None
     source: str = 'live_score'
+    level: str | None = None          # fused multi-board level ('motion' / 'still' / 'mixed'), ESPectre worker
 
 @app.post('/ingest/observation')
 def ingest(o: Observation):
     """Used by the sensor runner (live or replay). Local only."""
-    ev = svc.observe(o.sensor_id, o.score, o.motion, o.source)
+    ev = svc.observe(o.sensor_id, o.score, o.motion, o.source, level=o.level)
     return dict(event=ev)
 
 @app.post('/ingest/ml')

@@ -36,6 +36,8 @@ def investigate(svc, event_id, expected_hz=2.0):
     obs.append(f"Source: {ev['source']}" + (' (recorded replay, not a live person)' if ev['source'] in ('wifall_replay', 'synthetic') else ''))
     if 'peak_score' in o and th.get('high'):
         obs.append(f"Peak movement score {o['peak_score']} = {o['peak_score'] / th['high']:.1f}x the calibrated 'abrupt' threshold {th['high']:.3g}.")
+    if 'burst_seconds' in o:
+        obs.append(f"Strong-movement burst lasted {o['burst_seconds']} s (a fall burst is at most {o.get('burst_max_s', 3)} s; longer is walking).")
     if 'idle_seconds' in o:
         obs.append(f"Low activity for {o['idle_seconds']} s after the event (threshold {th.get('low', o.get('low_threshold'))}).")
     if pre:

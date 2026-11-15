@@ -154,9 +154,10 @@ export class AuraCare {
 
   _renderMotion(c) {
     const s = c.score || {}, fresh = c.sensor && c.sensor.fresh;
-    this._text('aura-score', s.latest == null ? '--' : `${Math.round(s.latest * 100)}%`);
+    const raw = s.moving_at != null && s.moving_at !== 0.5;          // ESPectre board score: show the number
+    this._text('aura-score', s.latest == null ? '--' : raw ? s.latest.toFixed(2) : `${Math.round(s.latest * 100)}%`);
     const st = $('aura-motion-state');
-    const moving = s.latest != null && s.latest >= 0.5;
+    const moving = s.latest != null && s.latest >= (s.moving_at ?? 0.5);
     if (st) {
       st.dataset.s = s.latest == null ? '' : moving ? 'moving' : 'still';
       st.textContent = s.latest == null ? 'NO DATA' : moving ? 'MOVING' : 'STILL';

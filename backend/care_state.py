@@ -36,7 +36,8 @@ def snapshot(svc):
                sensor=dict(status=h['status'], fresh=h['fresh'], last_seen_age_s=h['last_seen_age_s']),
                score=dict(latest=obs[-1]['score'] if obs and h['fresh'] else None,
                           series=[[round(o['ts'] - t, 2), round(o['score'], 3)] for o in obs],
-                          high=th.get('high'), low=th.get('low')),
+                          high=th.get('high'), low=th.get('low'),
+                          moving_at=th.get('high') if svc.s.detector == 'burst' else 0.5),
                event=None, checkin=None, messages=[])
     c = _active_checkin(svc.db)
     if c:

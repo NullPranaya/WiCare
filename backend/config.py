@@ -29,6 +29,12 @@ class Settings:
         self.photon_line = os.getenv('PHOTON_LINE', '')              # optional: our line's E.164; else looked up per assignment
         # live activity model: only attached to events after the live-vs-WiFall check passed
         self.live_har_validated = _b('LIVE_HAR_VALIDATED', '0')
+        # detector: 'burst' (default, the live demo) = ESPectre boards + the team's burst-then-stillness rule
+        #           (monitoring/burst_rule.py); 'score' = earlier research path, room-trained CSI score + anomaly.py
+        self.detector = os.getenv('DETECTOR', 'burst').strip().lower()
+        self.burst_threshold = float(os.getenv('BURST_THRESHOLD', '0.962'))
+        self.burst_max_s = float(os.getenv('BURST_MAX_S', '3.0'))
+        self.burst_still_s = float(os.getenv('BURST_STILL_S', '8.0'))
 
     def role_of(self, address):
         if address and address == self.patient_address: return 'patient'

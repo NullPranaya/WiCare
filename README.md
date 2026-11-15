@@ -12,7 +12,7 @@
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-random%20forest-F7931E?logo=scikitlearn&logoColor=white)
 ![ESP32](https://img.shields.io/badge/ESP32-CSI%20sensing-E7352C?logo=espressif&logoColor=white)
 ![iMessage](https://img.shields.io/badge/Photon-iMessage-34C759?logo=apple&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-30%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-37%20passing-brightgreen)
 ![Paid APIs](https://img.shields.io/badge/paid%20APIs-0-blue)
 
 **HackPrinceton Fall 2026**
@@ -25,9 +25,10 @@ Every Wi-Fi router fills a room with radio waves. Those waves bounce off walls, 
 reach a receiver. When a person moves, the bounces change, and the change is measurable down to the individual
 frequencies inside the signal.
 
-**AuraCare reads those changes.** Two ESP32 boards listen to the room's Wi-Fi, a model trained in that room turns
-the signal into a live movement score, and a set of temporal rules watches for one specific pattern: **a burst of
-movement followed by stillness.** When it sees that, AuraCare doesn't sound an alarm. It asks:
+**AuraCare reads those changes.** ESP32 boards running ESPectre firmware listen to the room's Wi-Fi and turn the
+signal into a motion score four times a second. AuraCare fuses the boards and watches for one specific shape in
+time: **a short burst of strong movement (at most 3 s), followed by 8 s of stillness.** Walking past, rolling
+over or getting up don't match it. When it sees a match, AuraCare doesn't sound an alarm. It asks:
 
 > 💙 **AuraCare | Wellbeing Check**
 >
@@ -75,49 +76,45 @@ from recorded sensor data, with the IDs of the measurements it used.
 ## 1. The signal path
 
 ```
-        ))) ))) )))                                                  ┌──────────────┐
-   ┌──────────────┐    2.4 GHz, ch 6, 20 MHz     ┌──────────────┐    │  64 complex  │
-   │  iPhone 15   │  ~~~~~~~~~~~~~~~~~~~~~~~~~>  │ ESP32 node 2 │───>│ subcarriers  │──┐
-   │  Pro hotspot │  ~~~~~~ bounce off  ~~~~~~>  └──────────────┘    │ per packet   │  │
-   │  (room ctr)  │  ~~~~~~ walls, people ~~~~>  ┌──────────────┐    └──────────────┘  │
-   └──────────────┘  ~~~~~~~~~~~~~~~~~~~~~~~~~>  │ ESP32 node 3 │───> same, ~29/s ─────┤
-                                                 └──────────────┘                      │
-                                                                                       v
-   ┌───────────┐   ┌────────────────┐   ┌──────────────────┐   ┌───────────────┐   ┌────────┐
-   │ iMessage  │<──│ check-in state │<──│ policy: opt-in,  │<──│ burst then 8s │<──│ P(move)│
-   │ patient + │   │ machine (15 s) │   │ sensor fresh, no │   │ stillness rule│   │ 1 Hz   │
-   │ + nurse   │   └────────────────┘   │ open check-in    │   └───────────────┘   └────────┘
+        ))) ))) )))                                                    ┌─────────────────┐
+   ┌──────────────┐    2.4 GHz, ch 6, 20 MHz     ┌────────────────┐    │ motion score    │
+   │  iPhone      │  ~~~~~~~~~~~~~~~~~~~~~~~~~>  │ ESP32 board b1 │───>│ 4 / s, SSE      │──┐
+   │  hotspot     │  ~~~~~~ bounce off  ~~~~~~>  │ ESPectre fw    │    └─────────────────┘  │
+   │  (router)    │  ~~~~~~ walls, people ~~~~>  ┌────────────────┐                          │  fusion:
+   └──────────────┘  ~~~~~~~~~~~~~~~~~~~~~~~~~>  │ ESP32 board b2 │───> same ────────────────┤  a burst counts only
+                                                 └────────────────┘                          │  if every board saw it
+                                                                                             v
+   ┌───────────┐   ┌────────────────┐   ┌──────────────────┐   ┌──────────────────────┐   ┌──────────┐
+   │ iMessage  │<──│ check-in state │<──│ policy: opt-in,  │<──│ burst <= 3 s, then   │<──│ fused    │
+   │ patient   │   │ machine (15 s) │   │ sensor fresh, no │   │ 8 s still  -> event  │   │ level    │
+   │ + nurse   │   └────────────────┘   │ open check-in    │   └──────────────────────┘   └──────────┘
    └───────────┘                        └──────────────────┘
 ```
 
-Each packet carries the **channel state information (CSI)** of 64 OFDM subcarriers: one complex number per
-frequency, describing how much that slice of the signal was weakened and shifted on its way across the room.
-A person walking through the room disturbs those numbers. A person lying still barely touches them.
+Under the hood each board measures the **channel state information (CSI)** of the Wi-Fi link: one complex number
+per OFDM subcarrier, describing how that slice of the signal was weakened and shifted on its way across the room.
+ESPectre's on-board detector condenses those changes into one motion score per evaluation, calibrated for the room.
+A person throwing themselves to the floor spikes it. A person lying still barely moves it.
 
 ## 2. Architecture
 
 ```mermaid
 flowchart LR
     subgraph RF["Physical layer"]
-        TX[iPhone hotspot<br/>transmitter] -. multipath .-> N2[ESP32 node 2]
-        TX -. multipath .-> N3[ESP32 node 3]
-    end
-    subgraph EDGE["Sensing laptop"]
-        N2 --> HUB[hub.py<br/>ws /v1/csi]
-        N3 --> HUB
+        TX[iPhone hotspot<br/>router] -. multipath .-> B1[ESP32 board b1<br/>ESPectre]
+        TX -. multipath .-> B2[ESP32 board b2<br/>ESPectre]
     end
     subgraph CORE["AuraCare core"]
-        HUB --> W[csi_worker<br/>timestamp windows]
-        W --> F[feature extraction<br/>23 features per node]
-        F --> M[room movement model<br/>random forest]
-        M --> S[median smoothing]
-        S --> D[temporal rules]
+        B1 -- SSE motion score 4/s --> W[espectre_worker<br/>one stream per board]
+        B2 -- SSE motion score 4/s --> W
+        W --> F[fusion<br/>every board must see the burst]
+        W --> REC[(session recordings<br/>fall dataset)]
+        F --> D[burst-then-stillness rule]
         D --> P[deterministic policy]
         P --> C[check-in<br/>state machine]
         D --> I[evidence investigator]
         I --> C
         DB[(SQLite<br/>observations, events,<br/>check-ins, messages)]
-        W -.-> DB
         D -.-> DB
         C -.-> DB
     end
@@ -135,9 +132,9 @@ sequenceDiagram
     participant A as AuraCare
     participant P as Patient
     participant C as Nurse
-    R->>A: CSI stream, both nodes
-    A->>A: movement score every second
-    Note over A: score >= 0.8, then <= 0.4 for 8 s
+    R->>A: motion score, 4 / s per board
+    A->>A: fuse boards, run the fall rule
+    Note over A: score >= 0.962 for at most 3 s, then below it for 8 s
     par at the same moment
         A->>P: Wellbeing Check: are you okay? 1 YES, 2 NO
     and
@@ -157,66 +154,42 @@ sequenceDiagram
 
 ## 3. Inside the pipeline
 
-### 3.1 Decoding the radio
-Almost every packet arrives as 256 signed bytes (802.11n): an L-LTF block and an HT-LTF block, each holding 64 subcarriers as
-`[imag, real]` pairs. AuraCare takes the L-LTF block (`raw[0:128]`) and rebuilds the complex channel:
+### 3.1 The board motion score
+Each ESP32 runs **ESPectre** firmware and keeps a Wi-Fi link busy with the hotspot (about 100 packets per second
+of ping traffic). On the board, ESPectre turns the CSI of those packets into a motion score and streams one
+evaluation every 250 ms as Server-Sent Events: `event: motion`, `data: {"timestamp_ms", "state", "score"}`.
+`monitoring/espectre_worker.py` holds one stream per board, reconnects with backoff, and never opens the raw CSI
+stream (that would pause the on-board detector). The threshold **0.962** was calibrated by the team in the demo
+room: it fires on aggressive motion and ignores shifting, breathing and rolling over.
 
-$$H_k = \text{real}_k + j \cdot \text{imag}_k, \qquad k \in \{0..31,\ -32..-1\}$$
+### 3.2 Two boards, one opinion
+With two boards (one on each side of the bed), a burst only counts if **every board crossed the threshold within
+1 s**. Stillness needs every board below it. One board alone reads `mixed`, so someone walking past one board
+can't start a fall. A board that goes silent for more than 1.5 s is dropped from the vote, and the rule restarts
+rather than treat silence as stillness.
 
-It then drops the DC and guard subcarriers (12 of them) and reorders the remaining 52 into frequency order
-$[-26..-1,\ +1..+26]$. The order was verified, not assumed: a lag-2 phase-continuity test compares the phase jump
-across the middle of the band against the typical jump between neighbours. The correct layout won on
-**26 out of 26** node recordings.
+### 3.3 The fall rule
+An alert is a shape in time, not a single reading (`monitoring/burst_rule.py`, from the team's WiCare app):
 
-### 3.2 Surviving real hardware
-Spec sheets said 45 to 50 packets per second. We measured the room instead:
+```
+MONITORING --score >= 0.962--> BURST --score < 0.962--> STILLNESS --8 s--> FALL -> event -> check-in
+                                 |                          |
+                                 | burst > 3 s              | movement again (after a 0.75 s grace)
+                                 v                          v
+                              MOVEMENT (walking, getting up: no alert) --1 s quiet--> MONITORING
+```
 
-| Signal property | Measured |
-|---|---|
-| Packets delivered per node | **~29 / s** |
-| Packets lost in transit (sequence gaps) | **~34%** |
-| Longest gap | **0.8 s** |
-| Packets with subcarriers 0 and +1 zeroed by the chip | **100%** |
+$$\text{fall} \iff \underbrace{t_\text{end} - t_\text{start} \le 3\,\text{s}}_{\text{burst}} \ \wedge\ \underbrace{s_t < 0.962\ \ \forall t \in [t_\text{end},\ t_\text{end} + 8\,\text{s}]}_{\text{stillness}}$$
 
-So nothing in AuraCare assumes a fixed rate. Every window is cut from laptop receive timestamps, checked with
-sequence numbers, and interpolated onto a 50 Hz grid:
+Every event records the peak score, the burst length and the stillness length, so the nurse's "why did this
+alert?" answer can quote them.
 
-- **length:** 2.96 s (148 samples)
-- **coverage:** at least 60% of the expected packets
-- **max gap:** 0.3 s, otherwise the window is discarded and nothing is inferred
+### 3.4 Every session is a dataset
+Each live run is saved to `data/sessions/<time>.jsonl` (`t, board, score, device_ms` per sample, the same format
+as the WiCare app). Any recording replays through the full pipeline in real time
+(`--replay`), so every fall the team performs becomes a test case for tuning the rule and, later, training a model.
 
-The zeroed subcarrier +1 is filled from its neighbour instead of feeding the model a fake zero.
-
-### 3.3 Turning waves into motion
-For each node and each window, AuraCare computes 23 motion features from the amplitude matrix
-$X \in \mathbb{R}^{148 \times 52}$:
-
-| Family | What it captures |
-|---|---|
-| Subcarrier spread | how much each frequency fluctuates over the window |
-| Step energy | $\lvert X_{t+1} - X_t \rvert$: how violently the channel changes between samples |
-| Energy timing | where in the 3 s the motion peaks, and early vs late energy |
-| Principal component | share of variance in the dominant motion direction (SVD) |
-| Spectral bands | power of that component in 0.3-1, 1-2, 2-4, 4-8 and 8-20 Hz bands |
-| Robust z-scores | fraction of samples far outside the window's own median |
-
-No absolute signal level is used, so the model reacts to *movement*, not to where the boards happen to sit.
-
-### 3.4 The movement score
-Both nodes' features are concatenated (46 values) and passed to a random forest trained on recordings of this
-exact room. The output is one number per second:
-
-$$s_t = P(\text{moving} \mid \phi(X^{(2)}_t) \oplus \phi(X^{(3)}_t)), \qquad \tilde{s}_t = \text{median}(s_{t-2},\ s_{t-1},\ s_t)$$
-
-### 3.5 The temporal rule
-An alert is a shape in time, not a single prediction:
-
-$$\exists\, t_0:\ \tilde{s}_{t_0} \ge 0.8 \quad\text{and}\quad \tilde{s}_t \le 0.4\ \ \forall\, t \in [t_1,\ t_1 + 8\,\text{s}],\ t_1 > t_0$$
-
-with no return to movement in between. If the sensor feed goes stale, the detector resets: **missing data is
-never treated as stillness.**
-
-### 3.6 The decision layer
+### 3.5 The decision layer
 A deterministic policy, not a model, decides whether a human gets a message. Before texting anyone it checks
 that the sensor is fresh, the participant opted in, the event source is allowed, and no check-in is already open.
 
@@ -231,19 +204,22 @@ that the sensor is fresh, the participant opted in, the event source is allowed,
 
 The nurse is told the moment the patient is texted, so a check-in never happens behind the care team's back.
 
-### 3.7 The evidence investigator
+### 3.6 The evidence investigator
 Every event gets a report assembled only from stored numbers: sensor health, activity 30 s before and after,
 signal coverage, the check-in timeline. Every sentence cites the observation IDs it came from. Nurse
 questions are routed by keyword to the right part of that report. **There is no language model anywhere in the
 loop, so there is nothing to hallucinate.**
 
-### 3.8 Messaging
+### 3.7 Messaging
 Outbound: four Photon 2.0 REST calls (resolve user, find their assigned iMessage line, open the direct space,
 send) with idempotency keys, so a retry can never double-text. Inbound: Standard Webhooks signatures
 (HMAC-SHA256 over `id.timestamp.body`, 5 minute window, secret rotation supported) verified before a single byte
 is processed. Recipients are resolved by role from server config: no code path can text an arbitrary number.
 
 ## 4. Results
+
+Before switching to ESPectre's on-board score for the live demo, we built and evaluated a full raw-CSI
+machine-learning path. It stays in the repo (`DETECTOR=score`) as the base for a learned fall model.
 
 ### 4.1 Public benchmark: WiFall
 Five activities (fall, jump, sit, stand, walk), 926 usable 3 s clips, 10 participants.
@@ -260,7 +236,7 @@ Five activities (fall, jump, sit, stand, walk), 926 usable 3 s clips, 10 partici
 "fall" inside the prediction set for **94.6%** of real falls. If the set holds more than one label, the model
 abstains.
 
-### 4.2 Our room
+### 4.2 Our room (raw CSI, RuView firmware, 2 nodes)
 13 one-minute recordings: empty room, one and two people still, one and two people moving, plus sit-down /
 stand-up and jump sessions driven by **28 spoken, timestamped prompts**.
 
@@ -284,9 +260,70 @@ used for alerts**.
 
 People counting at 0.64 is too weak to act on, so it is never allowed to cancel an alert.
 
+### 4.3 Research path: from raw CSI to a movement score
+
+#### Decoding the radio
+Almost every packet arrives as 256 signed bytes (802.11n): an L-LTF block and an HT-LTF block, each holding 64 subcarriers as
+`[imag, real]` pairs. AuraCare takes the L-LTF block (`raw[0:128]`) and rebuilds the complex channel:
+
+$$H_k = \text{real}_k + j \cdot \text{imag}_k, \qquad k \in \{0..31,\ -32..-1\}$$
+
+It then drops the DC and guard subcarriers (12 of them) and reorders the remaining 52 into frequency order
+$[-26..-1,\ +1..+26]$. The order was verified, not assumed: a lag-2 phase-continuity test compares the phase jump
+across the middle of the band against the typical jump between neighbours. The correct layout won on
+**26 out of 26** node recordings.
+
+#### Surviving real hardware
+Spec sheets said 45 to 50 packets per second. We measured the room instead:
+
+| Signal property | Measured |
+|---|---|
+| Packets delivered per node | **~29 / s** |
+| Packets lost in transit (sequence gaps) | **~34%** |
+| Longest gap | **0.8 s** |
+| Packets with subcarriers 0 and +1 zeroed by the chip | **100%** |
+
+So nothing in AuraCare assumes a fixed rate. Every window is cut from laptop receive timestamps, checked with
+sequence numbers, and interpolated onto a 50 Hz grid:
+
+- **length:** 2.96 s (148 samples)
+- **coverage:** at least 60% of the expected packets
+- **max gap:** 0.3 s, otherwise the window is discarded and nothing is inferred
+
+The zeroed subcarrier +1 is filled from its neighbour instead of feeding the model a fake zero.
+
+#### Turning waves into motion
+For each node and each window, AuraCare computes 23 motion features from the amplitude matrix
+$X \in \mathbb{R}^{148 \times 52}$:
+
+| Family | What it captures |
+|---|---|
+| Subcarrier spread | how much each frequency fluctuates over the window |
+| Step energy | $\lvert X_{t+1} - X_t \rvert$: how violently the channel changes between samples |
+| Energy timing | where in the 3 s the motion peaks, and early vs late energy |
+| Principal component | share of variance in the dominant motion direction (SVD) |
+| Spectral bands | power of that component in 0.3-1, 1-2, 2-4, 4-8 and 8-20 Hz bands |
+| Robust z-scores | fraction of samples far outside the window's own median |
+
+No absolute signal level is used, so the model reacts to *movement*, not to where the boards happen to sit.
+
+#### A room-trained movement score
+Both nodes' features are concatenated (46 values) and passed to a random forest trained on recordings of this
+exact room. The output is one number per second:
+
+$$s_t = P(\text{moving} \mid \phi(X^{(2)}_t) \oplus \phi(X^{(3)}_t)), \qquad \tilde{s}_t = \text{median}(s_{t-2},\ s_{t-1},\ s_t)$$
+
+#### Its temporal rule
+An alert is a shape in time, not a single prediction:
+
+$$\exists\, t_0:\ \tilde{s}_{t_0} \ge 0.8 \quad\text{and}\quad \tilde{s}_t \le 0.4\ \ \forall\, t \in [t_1,\ t_1 + 8\,\text{s}],\ t_1 > t_0$$
+
+with no return to movement in between. If the sensor feed goes stale, the detector resets: **missing data is
+never treated as stillness.**
+
 ## 5. Fail-safe by design
 
-30 automated tests, one or more per rule:
+37 automated tests, one or more per rule:
 
 | Guarantee | Tests |
 |---|---|
@@ -298,6 +335,7 @@ People counting at 0.64 is too weak to act on, so it is never allowed to cancel 
 | Webhooks need a valid, fresh signature; rotation works; own messages ignored | `test_unknown_sender_and_bad_signature`, `test_signature_rotation_and_stale_timestamp`, `test_own_agent_message_ignored` |
 | Reports cite only real IDs; nurse answers are grounded; replays are labelled | `test_report_*`, `test_stale_sensor_report_*`, `test_caregiver_question_gets_grounded_answer`, `test_replay_labelled` |
 | Activity labels attach to events only after live validation | `test_ml_only_attached_after_validation` |
+| A fall needs a short burst then 8 s still; long bursts (walking), movement during stillness and signal gaps never alert; every board must see the burst | `test_short_burst_*`, `test_long_burst_is_walking_not_a_fall`, `test_movement_during_stillness_cancels`, `test_signal_gap_*`, `test_fusion_*`, `test_burst_mode_*` |
 | Windows follow the real packet rate; layout check survives the zeroed subcarrier | `test_window_*`, `test_lag2_*` |
 
 **Privacy:** no video, no audio, no MAC addresses, phone numbers only in a local `.env`, roles (patient / nurse)
@@ -308,16 +346,17 @@ instead of numbers everywhere else, consenting teammates only.
 | Layer | Technology | Role |
 |---|---|---|
 | Radio | iPhone 15 Pro hotspot, 2.4 GHz ch 6, 20 MHz HT | transmitter |
-| Sensors | 2x ESP32-WROOM-32 DevKit V1, RuView firmware | CSI capture, 64 subcarriers per packet |
-| Edge | RuView hub, WebSocket `/v1/csi` | raw packet stream with timestamps and sequence numbers |
-| Signal processing | NumPy, SciPy | subcarrier mapping, timestamp windowing, interpolation, SVD, FFT |
-| Machine learning | scikit-learn (random forest), PyTorch (1D CNN) | room movement score; WiFall benchmark ensemble |
+| Sensors | ESP32 boards, ESPectre firmware | on-board CSI motion score, 4 / s per board |
+| Streaming | Server-Sent Events, one reader thread per board | live scores, reconnect, two-board fusion |
+| Fall rule | burst-then-stillness state machine | burst <= 3 s, then 8 s still, every board must agree |
+| Signal processing (research) | NumPy, SciPy | raw-CSI subcarrier mapping, windowing, SVD, FFT |
+| Machine learning (research) | scikit-learn (random forest), PyTorch (1D CNN) | room movement score; WiFall benchmark ensemble |
 | Uncertainty | split conformal prediction | calibrated prediction sets and abstention |
 | Backend | FastAPI, Uvicorn, SQLite | ingestion, rules, policy, check-ins, evidence store |
 | Reasoning | deterministic investigator + keyword reply parser | grounded nurse answers, no LLM |
 | Messaging | Photon 2.0 REST API, Standard Webhooks | iMessage check-ins and replies |
 | Networking | Cloudflare Tunnel | public HTTPS for webhooks |
-| Testing | pytest | 30 safety and correctness tests |
+| Testing | pytest | 37 safety and correctness tests |
 
 ## 7. Quickstart
 
@@ -328,7 +367,6 @@ git clone https://github.com/NullPranaya/Wi-Fall.git && cd Wi-Fall
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-cp models/room_calibration.json calibration.json
 pytest -q
 ```
 
@@ -342,6 +380,9 @@ pytest -q
 | `PHOTON_MODE` | `mock` logs messages, `api` sends them |
 | `PHOTON_PROJECT_ID`, `PHOTON_PROJECT_API_KEY` | from the Photon dashboard |
 | `PHOTON_WEBHOOK_SECRET` | the `whsec_...` secret from the webhook destination |
+| `ESPECTRE_BOARDS` | `b1=http://<board ip>:62587/espectre/v1,b2=...` |
+| `BURST_THRESHOLD`, `BURST_MAX_S`, `BURST_STILL_S` | fall rule: 0.962, 3 s, 8 s |
+| `DETECTOR` | `burst` (live demo, default) or `score` (raw-CSI research path) |
 
 **Photon in four steps**
 1. Dashboard: copy the **Project id**, create an **API key**.
@@ -360,19 +401,23 @@ uvicorn backend.main:app --host 127.0.0.1 --port 8000
 cloudflared tunnel --url http://127.0.0.1:8000
 
 # terminal 3, pick one
-python -m monitoring.csi_worker --hub ws://<hub laptop>:8770/v1/csi                          # live boards
-python -m monitoring.csi_worker --replay <room dataset> --chunks p1_moving_1,p1_still_1 --lead 15   # recorded room, alert in ~30 s
-python -m monitoring.csi_worker --synthetic                                                  # labelled fallback
+python -m monitoring.espectre_worker                              # live boards from ESPECTRE_BOARDS, records the session
+python -m monitoring.espectre_worker --replay data/sessions/<file>.jsonl   # replay a recorded session
+python -m monitoring.csi_worker --synthetic                       # labelled fallback, no boards
 ```
 
-Live output, one line per second:
+Live output (two boards):
 ```
-16:30:07 score 0.81 smoothed 0.81 MOVING
-16:30:09 score 0.38 smoothed 0.44 still
-16:30:12 score 0.13 smoothed 0.13 still
-16:30:18 score 0.06 smoothed 0.07 still
-  EVENT evt_2d4bd46da8 abrupt_motion_then_inactivity {'action': 'routine_checkin', ...}
+20:14:49 board b1: connected
+20:14:49 board b2: connected
+20:14:52 score 0.200 STILL
+20:14:53 score 1.300 MIXED          <- only one board has seen the burst so far
+20:14:54 score 1.300 MOTION         <- both boards: the burst counts
+20:14:55 score 0.100 STILL
+  ...
+  EVENT evt_cdcb15967f burst_then_stillness {'action': 'routine_checkin', ...}
 ```
+The board allows two stream clients at most: don't run another app against the same boards during the demo.
 
 Reproduce every number in this README:
 ```bash
@@ -380,7 +425,7 @@ python -m ml.data data/raw/WiFall data/clips.npz
 python -m ml.train_rf data/clips.npz --rate 50 && python -m ml.train_cnn && python -m ml.evaluate
 python -m ml.eval_auracare <room dataset>      # WiFall model in our room
 python -m ml.eval_room <room dataset>          # held-out room models
-python -m ml.room_motion train <room dataset>  # deployed movement model
+python -m ml.room_motion train <room dataset>  # research movement model
 ```
 
 ## 9. API
@@ -404,7 +449,7 @@ Interactive docs at `http://127.0.0.1:8000/docs`.
 
 ```
 backend/         FastAPI app, settings, SQLite store, service layer
-monitoring/      csi_worker (live / replay / synthetic), temporal rules, policy, calibration
+monitoring/      espectre_worker (live boards, recording, replay), burst rule + fusion, policy; csi_worker (research)
 sensors/         subcarrier mapping, layout checks, timestamp windowing, sensor health
 ml/              WiFall pipeline (RF, CNN, conformal), room dataset loader, room movement model, evaluations
 investigation/   evidence investigator and grounded nurse answers
@@ -412,27 +457,28 @@ photon/          Photon 2.0 client, webhook verification, check-in state machine
 models/          room movement model, calibration, conformal threshold
 evaluation/      saved metrics behind every number above
 sim/             WiFall replay sensor
-tests/           30 tests
+tests/           37 tests
 ```
 
 ## 11. Limitations and roadmap
 
 **Honest limits**
-- **No real falls were recorded.** The alert rule is validated on recorded movement-to-stillness transitions and
-  28 prompted sit / stand / jump actions, not on falls.
-- **One room, one session.** Held-out recordings were minutes apart, so the numbers are likely optimistic.
-  A new room needs a short recording and a retrain.
-- **Lossy radio.** A third of packets never arrive on two nodes.
+- **Fall recordings are just starting.** The rule's numbers (0.962, 3 s, 8 s) were tuned by the team on the real
+  board in the demo room; the session recorder now collects real falls (onto a crash mat) to measure it properly.
+- **One room.** The threshold is calibrated per room; a new room needs a new calibration.
+- **The hotspot is part of the sensor.** If someone picks up the phone, the link changes.
 
 **Next**
 - multi-day recordings, furniture changes, more rooms
 - per-person routines instead of fixed thresholds
-- presence and people-count from the hub as investigator context
+- a learned fall model on the recorded sessions, starting from the raw-CSI research path
 - a nurse dashboard across multiple rooms and patients
 
 ## 12. Credits
 
+- ESPectre: ESP32 Wi-Fi motion sensing firmware running on the boards
+- [WiCare](https://github.com/duna-akin/WiCare): the team's board client, fusion and burst-then-stillness rule
 - [WiFall](https://github.com/RS2002/WiFall): public CSI activity dataset used for the benchmark
-- [RuView](https://github.com/ruvnet/RuView): ESP32 CSI firmware and sensing server
+- [RuView](https://github.com/ruvnet/RuView): CSI firmware for the research recordings, and the 3D room view
 - [Photon](https://photon.codes): iMessage messaging API
 - NumPy, SciPy, scikit-learn, PyTorch, FastAPI, Uvicorn, pytest

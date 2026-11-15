@@ -11,3 +11,4 @@ models/*.pt
 auracare.db*
 photon_events.jsonl
 !models/room_motion.joblib
+.DS_Store

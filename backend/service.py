@@ -5,6 +5,7 @@ from backend.db import DB, new_id, now, iso, loads
 from backend.config import settings as default_settings
 from monitoring import policy
 from monitoring.anomaly import Detector, Thresholds
+from monitoring.burst_rule import BurstDetector, BurstRule
 from photon.client import PhotonClient
 from photon import checkins
 from sensors.health import sensor_health
@@ -14,9 +15,16 @@ class Service:
         self.s = settings or default_settings
         self.db = db or DB(self.s.db_path)
         self.photon = PhotonClient(self.db, self.s)
-        self.calibration = self._load_calibration()
-        self.detector = Detector(Thresholds(**self.calibration['thresholds']),
-                                 expected_active=self.s.expected_active) if self.calibration else None
+        if getattr(self.s, 'detector', 'score') == 'burst':
+            rule = BurstRule(threshold=self.s.burst_threshold, burst_max_s=self.s.burst_max_s, still_s=self.s.burst_still_s)
+            self.calibration = dict(thresholds=dict(high=rule.threshold, low=rule.threshold, still_s=rule.still_s,
+                                                    burst_max_s=rule.burst_max_s),
+                                    note='ESPectre board motion score, burst-then-stillness rule tuned in the room (WiCare)')
+            self.detector = BurstDetector(rule)
+        else:
+            self.calibration = self._load_calibration()
+            self.detector = Detector(Thresholds(**self.calibration['thresholds']),
+                                     expected_active=self.s.expected_active) if self.calibration else None
         self.on_event = []        # callbacks, e.g. the evidence investigator
         self.latest_ml = None     # (ts, fused prediction) from the CSI worker
 
@@ -52,7 +60,7 @@ class Service:
         return sensor_health(self.db, sensor_id, self.s.stale_after_s)
 
     # ---- observations -> events
-    def observe(self, sensor_id, score, motion=None, source='live_score', ts=None, payload=None):
+    def observe(self, sensor_id, score, motion=None, source='live_score', ts=None, payload=None, level=None):
         """Ingest one movement-score observation. Returns created event or None."""
         if score is None:
             return None
@@ -66,7 +74,7 @@ class Service:
                   (oid, sensor_id, ts, float(score), None if motion is None else int(motion), source))
         if not self.detector:
             return None
-        ev = self.detector.feed(dict(id=oid, ts=ts, score=float(score)))
+        ev = self.detector.feed(dict(id=oid, ts=ts, score=float(score), level=level))
         return self.create_event(sensor_id, source, **ev) if ev else None
 
     def create_event(self, sensor_id, source, event_type, start_ts, evidence_ids, observations, ml=None):

@@ -80,8 +80,8 @@ def run(packets, api, sensor, source):
         post(api, sensor, round(sm, 4), source)
 
 def synthetic(api, sensor):
-    """Clearly labelled demo fallback: 4 s high movement then 12 s still, source='synthetic'."""
-    for s in [0.3] * 3 + [0.95] * 4 + [0.05] * 12:
+    """Clearly labelled demo fallback: 2 s strong movement then 12 s still, source='synthetic'."""
+    for s in [0.3] * 3 + [1.2] * 2 + [0.05] * 12:      # burst clears both detectors (0.8 score rule, 0.962 board rule)
         print('synthetic score', s); post(api, sensor, s, 'synthetic'); time.sleep(1)
 
 if __name__ == '__main__':
