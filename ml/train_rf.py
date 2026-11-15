@@ -1,4 +1,3 @@
-"""Leave-one-participant-out RF on WiFall clips. Writes evaluation/rf_metrics.json + confusion matrix."""
 import json, sys
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
