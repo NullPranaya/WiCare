@@ -149,7 +149,7 @@ backend/ ml/ monitoring/ photon/ sensors/ investigation/ sim/ evaluation/ models
 - The 3D room view is an animation that plays when the nurse opens the room. It is not reconstructed from the
   Wi-Fi signal.
 - Beds 2 to 6 on the ward page are simulated by the dashboard; Bed 1 is the live one.
-- The pictures above were taken with the simulated signal, not with boards in a patient's room.
+- The pictures above were taken with the simulated signal, not with boards in the patient's room
 
 ## Credits
 
