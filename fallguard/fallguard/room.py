@@ -18,4 +18,4 @@ router = APIRouter()
 
 @router.get(ROOM_PATH)
 async def room() -> FileResponse:
-    return FileResponse(STATIC_DIR / "room.html")
+    return FileResponse(STATIC_DIR / "room.html", headers={"Cache-Control": "no-cache"})

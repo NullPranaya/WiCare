@@ -37,6 +37,7 @@ class ReplySource(Protocol):
 
 
 STATIC_DIR = Path(__file__).parent / "static"
+NO_CACHE = {"Cache-Control": "no-cache"}  # browsers re-check, so an update never mixes old and new files
 TICK_S = 0.25
 HEALTH_S = 2.0
 REPLY_POLL_S = 2.0
@@ -48,6 +49,13 @@ class ArmRequest(BaseModel):
 
 class MarkRequest(BaseModel):
     label: Literal["fall", "false_alarm"]
+
+
+class RevalidatedStaticFiles(StaticFiles):
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers.update(NO_CACHE)
+        return response
 
 
 class Engine:
@@ -251,12 +259,12 @@ def create_app(
 
     app = FastAPI(lifespan=lifespan)
     app.state.engine = engine
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    app.mount("/static", RevalidatedStaticFiles(directory=STATIC_DIR), name="static")
     app.include_router(room_router)
 
     @app.get("/")
     async def index() -> FileResponse:
-        return FileResponse(STATIC_DIR / "index.html")
+        return FileResponse(STATIC_DIR / "index.html", headers=NO_CACHE)
 
     @app.websocket("/ws")
     async def ws(socket: WebSocket) -> None:

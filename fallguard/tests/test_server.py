@@ -2,6 +2,7 @@ import asyncio
 import json
 from datetime import datetime
 
+import pytest
 from fastapi.testclient import TestClient
 
 from fallguard.alerts import AlertManager
@@ -317,3 +318,10 @@ def test_room_page_served(tmp_path):
     with TestClient(build(tmp_path, [])) as client:
         response = client.get("/room")
     assert response.status_code == 200 and "Room view" in response.text
+
+
+@pytest.mark.parametrize("path", ["/", "/static/app.js", "/static/style.css", "/room"])
+def test_pages_and_assets_are_revalidated(tmp_path, path):
+    with TestClient(build(tmp_path, [])) as client:
+        response = client.get(path)
+    assert response.status_code == 200 and response.headers["cache-control"] == "no-cache"
