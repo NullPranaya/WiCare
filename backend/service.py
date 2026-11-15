@@ -9,14 +9,12 @@ from monitoring.burst_rule import BurstDetector, BurstRule
 from photon.client import PhotonClient
 from photon import checkins
 from sensors.health import sensor_health
-from backend.ward import Ward
 
 class Service:
     def __init__(self, settings=None, db=None):
         self.s = settings or default_settings
         self.db = db or DB(self.s.db_path)
         self.photon = PhotonClient(self.db, self.s)
-        self.ward = Ward(self.photon, self.db, board_threshold=getattr(self.s, 'burst_threshold', 0.962))  # backend/ward.py
         if getattr(self.s, 'detector', 'score') == 'burst':
             rule = BurstRule(threshold=self.s.burst_threshold, burst_max_s=self.s.burst_max_s, still_s=self.s.burst_still_s)
             self.calibration = dict(thresholds=dict(high=rule.threshold, low=rule.threshold, still_s=rule.still_s,
@@ -74,8 +72,6 @@ class Service:
         ts = ts or now()
         self.db.x('INSERT INTO observations(id,sensor_id,ts,score,motion,source) VALUES(?,?,?,?,?,?)',
                   (oid, sensor_id, ts, float(score), None if motion is None else int(motion), source))
-        if source.startswith('espectre'):                 # WiCare boards also drive the room's stress monitor
-            self.ward.board_sample(float(score), ts)
         if not self.detector:
             return None
         ev = self.detector.feed(dict(id=oid, ts=ts, score=float(score), level=level))
@@ -109,7 +105,7 @@ class Service:
                           demo_mode=self.s.demo_mode, expected_active=self.s.expected_active,
                           open_checkin=checkins.open_for_patient(self.db))
         self.db.x('UPDATE events SET policy=? WHERE id=?', (json.dumps(d.__dict__), event_id))
-        if d.action == 'routine_checkin' and getattr(self.s, 'patient_checkins', True):
+        if d.action == 'routine_checkin':
             checkins.open_checkin(self.db, self.photon, ev, self.s.checkin_timeout_s)
         elif d.action == 'sensor_unavailable':
             self.db.x("UPDATE events SET review_status='sensor_unavailable' WHERE id=?", (event_id,))

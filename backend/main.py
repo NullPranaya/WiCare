@@ -2,8 +2,6 @@
 import json, sqlite3, threading
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
-from backend.ward import CONTROL_HTML
 from pydantic import BaseModel
 from backend.service import Service
 from backend.db import now
@@ -24,45 +22,19 @@ def _timeout_worker(stop):
         except Exception as e: print('sweep error', e)
         stop.wait(2)
 
-def _ward_worker(stop):
-    while not stop.is_set():
-        try: svc.ward.tick()
-        except Exception as e: print('ward error', e)
-        stop.wait(1)
-
 @asynccontextmanager
 async def lifespan(app):
     stop = threading.Event()
     threading.Thread(target=_timeout_worker, args=(stop,), daemon=True).start()
-    threading.Thread(target=_ward_worker, args=(stop,), daemon=True).start()
     yield
     stop.set()
 
 app = FastAPI(title='WiCare', lifespan=lifespan)
 # the room UI (frontend/, served on :3000) reads /care/state; local origins only, read-only
-app.add_middleware(CORSMiddleware, allow_origin_regex=r'http://(localhost|127\.0\.0\.1)(:\d+)?', allow_methods=['GET', 'POST'], allow_headers=['content-type'])
+app.add_middleware(CORSMiddleware, allow_origin_regex=r'http://(localhost|127\.0\.0\.1)(:\d+)?', allow_methods=['GET'])
 
 @app.get('/care/state')
 def care(): return care_state.snapshot(svc)
-
-# ---- ward demo: 5 stress monitors, room 5 set from the control page, nurse asked over iMessage
-class StressIn(BaseModel):
-    value: float
-
-@app.get('/ward/state')
-def ward_state(): return svc.ward.state()
-
-@app.get('/ward/control', response_class=HTMLResponse)
-def ward_control(): return CONTROL_HTML
-
-@app.post('/ward/stress')
-def ward_stress(body: StressIn): return dict(target=svc.ward.set_target(body.value))
-
-@app.post('/ward/view')
-def ward_view(): return svc.ward.view()
-
-@app.post('/ward/close')
-def ward_close(): svc.ward.close(); return dict(ok=True)
 
 def _404(x, what):
     if not x: raise HTTPException(404, f'{what} not found')
@@ -154,13 +126,6 @@ async def photon_webhook(request: Request):
         svc.db.x('UPDATE messages SET checkin_id=?, event_id=? WHERE platform_id=?', (c['id'], c['event_id'], msg['message_id']))
         r = reply_parser.interpret(msg['text'])
         return dict(interpretation=r, checkin=checkins.apply_reply(svc.db, svc.photon, checkins.get(svc.db, c['id']), r['intent'], msg['text'], r['source']))
-    # nurse answering a ward alert ("Room 5 stress is high, do you want to check?")
-    if svc.ward.waiting():
-        intent = webhook.exact_intent(msg['text'])
-        if intent in ('acknowledged', 'help_requested'):
-            a = svc.ward.waiting()
-            svc.db.x('UPDATE messages SET event_id=? WHERE platform_id=?', (a['id'], msg['message_id']))
-            return dict(ward=svc.ward.reply(intent))
     # caregiver question -> grounded answer about the latest event with a check-in
     latest = svc.db.one('SELECT id FROM events WHERE checkin_id IS NOT NULL ORDER BY created_ts DESC LIMIT 1')
     if not latest:
