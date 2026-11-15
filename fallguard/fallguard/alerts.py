@@ -22,7 +22,8 @@ class AlertResult:
 def fall_message(at: datetime, still_s: float) -> str:
     return (
         f"WiCare: possible fall detected at {at:%H:%M:%S}. "
-        f"Patient has been still for {still_s:.0f} s after a sudden movement."
+        f"Patient has been still for {still_s:.0f} s after a sudden movement.\n"
+        "Reply 1 to acknowledge, 2 to ignore."
     )
 
 

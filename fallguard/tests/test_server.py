@@ -72,7 +72,8 @@ def test_fall_flow_broadcasts_state_and_alert_once(tmp_path):
     falls = [m for m in seen if m["type"] == "state" and m["state"] == "FALL"]
     alerts = [m["imessage"] for m in seen if m["type"] == "alert"]
     assert len(falls) == 1 and alerts == ["sending", "sent"]
-    assert sent == ["WiCare: possible fall detected at 14:32:05. Patient has been still for 8 s after a sudden movement."]
+    assert sent == ["WiCare: possible fall detected at 14:32:05. Patient has been still for 8 s after a sudden movement.\n"
+                    "Reply 1 to acknowledge, 2 to ignore."]
 
 
 def test_board_state_label_is_ignored(tmp_path):
@@ -234,6 +235,82 @@ def test_source_crash_reports_disconnect_and_restarts(tmp_path):
             _, seen = receive_until(ws, lambda m: m["type"] == "sample" and m["t"] == 99.0)
     crashed = [m for m in seen if m["type"] == "board" and not m["connected"] and "stream broke" in m["detail"]]
     assert crashed and runs["n"] == 2
+
+
+# --- nurse replies and the room view --------------------------------------
+class FakeReplies:
+    def __init__(self) -> None:
+        self.armed = 0
+        self.queue: list[str] = []
+
+    def arm(self) -> None:
+        self.armed += 1
+
+    async def poll(self) -> list[str]:
+        out, self.queue = self.queue, []
+        return out
+
+
+def build_with_replies(tmp_path, replies, sender=None):
+    if sender is None:
+        _, sender = recorder()
+    alerts = AlertManager(sender, cooldown_s=60)
+    return create_app(make_config(tmp_path), [scripted(*FALL_SCRIPT)], None, alerts, clock=lambda: 0.0,
+                      wall=lambda: WALL, replies=replies)
+
+
+def test_nurse_reply_1_acknowledges_and_routes_to_room(tmp_path, monkeypatch):
+    monkeypatch.setattr("fallguard.server.REPLY_POLL_S", 0.01)
+    replies = FakeReplies()
+    with TestClient(build_with_replies(tmp_path, replies)) as client:
+        with client.websocket_connect("/ws") as ws:
+            receive_until(ws, lambda m: m["type"] == "alert" and m["imessage"] == "sent")
+            assert replies.armed == 1
+            replies.queue.append("acknowledge")
+            _, seen = receive_until(ws, lambda m: m["type"] == "route")
+    states = [m["state"] for m in seen if m["type"] == "state"]
+    alerts = [m["imessage"] for m in seen if m["type"] == "alert"]
+    assert states[-1] == "MONITORING" and alerts == ["acknowledged"]
+    assert seen[-1] == {"type": "route", "to": "/room"}
+    assert not (tmp_path / "marks.jsonl").exists()
+
+
+def test_nurse_reply_2_ignores_and_saves_false_alarm(tmp_path, monkeypatch):
+    monkeypatch.setattr("fallguard.server.REPLY_POLL_S", 0.01)
+    replies = FakeReplies()
+    with TestClient(build_with_replies(tmp_path, replies)) as client:
+        with client.websocket_connect("/ws") as ws:
+            receive_until(ws, lambda m: m["type"] == "alert" and m["imessage"] == "sent")
+            replies.queue.append("ignore")
+            _, seen = receive_until(ws, lambda m: m["type"] == "alert" and m["imessage"] == "ignored")
+    assert [m["state"] for m in seen if m["type"] == "state"] == ["MONITORING"]
+    assert not any(m["type"] == "route" for m in seen)
+    marks = [json.loads(line) for line in (tmp_path / "marks.jsonl").read_text().splitlines()]
+    assert [(m["label"], m["source"]) for m in marks] == [("false_alarm", "nurse_reply")]
+
+
+def test_reply_after_dashboard_ack_changes_nothing(tmp_path):
+    replies = FakeReplies()
+    app = build_with_replies(tmp_path, replies)
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws") as ws:
+            receive_until(ws, lambda m: m["type"] == "alert" and m["imessage"] == "sent")
+            client.post("/api/ack")
+            engine = app.state.engine
+            engine.on_reply("acknowledge")
+            assert engine.last_alert["imessage"] == "sent"
+
+
+def test_failed_send_does_not_wait_for_reply(tmp_path):
+    async def broken(text):
+        raise RuntimeError("Photon down")
+
+    replies = FakeReplies()
+    app = build_with_replies(tmp_path, replies, sender=broken)
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws") as ws:
+            receive_until(ws, lambda m: m["type"] == "alert" and m["imessage"] == "failed")
+    assert replies.armed == 0 and app.state.engine.awaiting_reply is False
 
 
 def test_room_page_served(tmp_path):

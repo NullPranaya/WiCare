@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from fallguard.alerts import AlertManager, NodeSender
 from fallguard.board import BoardClient
 from fallguard.config import load_config
+from fallguard.replies import PhotonReplies
 from fallguard.server import create_app
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
@@ -27,18 +28,24 @@ def build_app(replay: Path | None = None):
         NodeSender(PROJECT_DIR / "notify" / "send.mjs", config.nurse_phone) if config.nurse_phone else None
     )
     alerts = AlertManager(sender, config.cooldown_s)
+    http = httpx.AsyncClient()
+    project_id, api_key = os.environ.get("SPECTRUM_PROJECT_ID"), os.environ.get("SPECTRUM_PROJECT_SECRET")
+    replies = (
+        PhotonReplies(project_id, api_key, config.nurse_phone, http=http)
+        if config.nurse_phone and project_id and api_key
+        else None
+    )
     if replay is not None:
         from fallguard.replay import ReplaySource
 
-        return config, create_app(config, [ReplaySource(replay)], None, alerts, mode="replay")
+        return config, create_app(config, [ReplaySource(replay)], None, alerts, mode="replay", replies=replies)
 
-    http = httpx.AsyncClient()
     clients = [BoardClient(board_id, endpoint, http=http) for board_id, endpoint in config.boards]
 
     async def health():
         return list(await asyncio.gather(*(c.health() for c in clients)))
 
-    return config, create_app(config, [c.stream for c in clients], health, alerts)
+    return config, create_app(config, [c.stream for c in clients], health, alerts, replies=replies)
 
 
 def lan_address() -> str:

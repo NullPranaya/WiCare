@@ -14,7 +14,8 @@ AT = datetime(2026, 11, 14, 14, 32, 5)
 def test_fall_message_text():
     assert fall_message(AT, 8.0) == (
         "WiCare: possible fall detected at 14:32:05. "
-        "Patient has been still for 8 s after a sudden movement."
+        "Patient has been still for 8 s after a sudden movement.\n"
+        "Reply 1 to acknowledge, 2 to ignore."
     )
 
 

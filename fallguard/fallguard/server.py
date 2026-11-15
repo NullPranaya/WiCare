@@ -10,7 +10,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Protocol
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
@@ -22,15 +22,24 @@ from fallguard.board import BoardHealth, BoardStatus, MotionSample
 from fallguard.config import AppConfig
 from fallguard.detector import FallDetector, Status, level_for
 from fallguard.fusion import Fusion
+from fallguard.replies import Reply
+from fallguard.room import ROOM_PATH
 from fallguard.room import router as room_router
 
 SampleSource = Callable[[], AsyncIterator[MotionSample | BoardStatus]]
 HealthSource = Callable[[], Awaitable[list[BoardHealth]]]
 Mode = Literal["live", "replay"]
 
+
+class ReplySource(Protocol):
+    def arm(self) -> None: ...
+    async def poll(self) -> list[Reply]: ...
+
+
 STATIC_DIR = Path(__file__).parent / "static"
 TICK_S = 0.25
 HEALTH_S = 2.0
+REPLY_POLL_S = 2.0
 
 
 class ArmRequest(BaseModel):
@@ -42,9 +51,11 @@ class MarkRequest(BaseModel):
 
 
 class Engine:
-    def __init__(self, config, alerts, mode, clock, wall) -> None:
+    def __init__(self, config, alerts, mode, clock, wall, replies: ReplySource | None = None) -> None:
         self.config = config
         self.alerts = alerts
+        self.replies = replies
+        self.awaiting_reply = False  # an alert went out and the nurse has not answered yet
         self.mode = mode
         self.clock = clock
         self.wall = wall
@@ -126,7 +137,32 @@ class Engine:
 
     async def _send_alert(self, status: Status) -> None:
         result = await self.alerts.on_fall(self.wall(), status.still_s or self.config.rule.still_s)
+        if result.status == "sent" and self.replies is not None:
+            self.replies.arm()
+            self.awaiting_reply = True
         self._alert_status(result.status, result.detail)
+
+    def on_reply(self, reply: Reply) -> None:
+        """The nurse answered by text: 1 acknowledges (open the room view), 2 ignores (false alarm)."""
+        if not self.awaiting_reply:
+            return
+        self.awaiting_reply = False
+        before = self.detector.status
+        self._publish(before, self.detector.acknowledge(self.clock()))
+        if reply == "acknowledge":
+            self._alert_status("acknowledged", "nurse replied 1")
+            self.broadcast({"type": "route", "to": ROOM_PATH})
+        else:
+            self._alert_status("ignored", "nurse replied 2")
+            self.write_mark("false_alarm", "nurse_reply")
+
+    def write_mark(self, label: str, source: str) -> dict:
+        self.config.data_dir.mkdir(parents=True, exist_ok=True)
+        record = {"wall": self.wall().isoformat(timespec="seconds"), "t": self.clock(), "label": label,
+                  "state": self.detector.status.state.value, "source": source}
+        with open(self.config.data_dir / "marks.jsonl", "a") as f:
+            f.write(json.dumps(record) + "\n")
+        return record
 
     def tick(self) -> None:
         previous = self.detector.status
@@ -157,8 +193,9 @@ def create_app(
     clock: Callable[[], float] = time.monotonic,
     wall: Callable[[], datetime] = datetime.now,
     restart_delay_s: float = 1.0,
+    replies: ReplySource | None = None,
 ) -> FastAPI:
-    engine = Engine(config, alerts, mode, clock, wall)
+    engine = Engine(config, alerts, mode, clock, wall, replies)
 
     async def consume(source: SampleSource) -> None:
         """Run a source; on an unexpected error mark its board offline and restart it."""
@@ -187,11 +224,22 @@ def create_app(
                 engine.apply_health(await health())
             await asyncio.sleep(HEALTH_S)
 
+    async def poll_replies() -> None:
+        while True:
+            await asyncio.sleep(REPLY_POLL_S)
+            if not engine.awaiting_reply:
+                continue
+            with contextlib.suppress(Exception):  # a failed poll is retried on the next tick
+                for reply in await replies.poll():
+                    engine.on_reply(reply)
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         loops = [consume(s) for s in sources] + [ticker()]
         if health is not None:
             loops.append(poll_health())
+        if replies is not None:
+            loops.append(poll_replies())
         background = [asyncio.create_task(coro) for coro in loops]
         try:
             yield
@@ -231,6 +279,7 @@ def create_app(
 
     @app.post("/api/ack")
     async def ack() -> dict:
+        engine.awaiting_reply = False  # answered on the dashboard; a later text reply changes nothing
         before = engine.detector.status
         return engine.command(before, engine.detector.acknowledge(clock()))
 
@@ -241,11 +290,6 @@ def create_app(
 
     @app.post("/api/mark")
     async def mark(body: MarkRequest) -> dict:
-        config.data_dir.mkdir(parents=True, exist_ok=True)
-        record = {"wall": wall().isoformat(timespec="seconds"), "t": clock(), "label": body.label,
-                  "state": engine.detector.status.state.value}
-        with open(config.data_dir / "marks.jsonl", "a") as f:
-            f.write(json.dumps(record) + "\n")
-        return record
+        return engine.write_mark(body.label, "dashboard")
 
     return app

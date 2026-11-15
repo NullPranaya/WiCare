@@ -163,7 +163,9 @@ function alertText() {
   if (!a) return "No alerts sent yet";
   switch (a.imessage) {
     case "sending": return "Sending to the nurse iPhone…";
-    case "sent": return `Nurse alerted at ${a.at}`;
+    case "sent": return `Nurse alerted at ${a.at}. Waiting for their reply (1 acknowledge, 2 ignore)`;
+    case "acknowledged": return `Nurse acknowledged at ${a.at}`;
+    case "ignored": return `Nurse ignored the alert at ${a.at}. Saved as a false alarm`;
     case "failed": return `Not sent at ${a.at}: ${a.detail}`;
     case "skipped_cooldown": return "Not resent: the nurse was alerted under a minute ago";
     case "no_recipient": return "Not sent: no nurse number is set (NURSE_PHONE)";
@@ -289,6 +291,9 @@ function onMessage(msg) {
       app.alert = msg;
       $("alert-text").textContent = alertText();
       render();
+      break;
+    case "route":
+      if (typeof msg.to === "string" && msg.to.startsWith("/")) location.assign(msg.to);
       break;
     case "board":
       app.boards.set(msg.board, { ...(app.boards.get(msg.board) || {}), ...msg });
