@@ -16,10 +16,9 @@ import { dotChart } from './aura-viz.js';
 // ?scene=fall plays the older fall story instead.
 const SCENE = new URLSearchParams(location.search).get('scene');
 // ?room=1: the WiCare room view. WiCare's dashboard sends the nurse here after they reply 1 to the fall alert
-// (wicare/fallguard/fallguard/room.py). Plays the wake-up story in a hospital room; no WiCare backend needed.
+// (wicare/fallguard/fallguard/room.py). Shows the patient falling to the floor beside the bed; no WiCare backend needed.
 const ROOM_VIEW = new URLSearchParams(location.search).has('room');
-const ROOM_VIEW_ = new URLSearchParams(location.search).has('room');
-const STORY = ROOM_VIEW_ ? [{ scenario: 'stand_fall', dur: 15 }]
+const STORY = ROOM_VIEW ? [{ scenario: 'stand_fall', dur: Infinity }]     // plays once: the patient stays on the floor
   : SCENE === 'fall' ? [{ scenario: 'elderly_care', dur: 26 }, { scenario: 'fall_event', dur: 34 }]
   : [{ scenario: 'wake_up', dur: 36 }];
 const IDLE_SCENE = SCENE === 'fall' ? 'elderly_care' : 'wake_up';
@@ -100,9 +99,8 @@ export class WiCare {
     this.t += dt;
     if (this.t > STORY[this.i].dur) return this._next();
     if (ROOM_VIEW) {
-      const pose = data && data.persons && data.persons[0] && data.persons[0].pose;
       const fp = data && data.persons && data.persons[0] && data.persons[0].fallProgress;
-      if (this._banner) this._banner.hidden = !((pose === 'bedfall' && fp > 0.3) || pose === 'falling' || pose === 'fallen');
+      if (this._banner) this._banner.hidden = !(fp > 0.3);
       return;
     }
     const pose = data && data.persons && data.persons[0] && data.persons[0].pose;

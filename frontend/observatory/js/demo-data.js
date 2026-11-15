@@ -12,6 +12,9 @@
 
 import { WAKE_BED } from './pose-system.js';
 
+// WiCare room view: where the patient stands (on the floor in front of the bed) and which way they face and fall
+export const FALL_SPOT = { x: -1.9, z: -1.2, facing: 1.1 };
+
 const SCENARIOS = [
   'empty_room',
   'single_breathing',
@@ -598,18 +601,17 @@ export class DemoDataGenerator {
   }
 
   // ========================================================================
-  // WiCare room view (?room=1): lying in bed 0-7 s, falls out of bed 7-8 s, on the floor until 15 s.
+  // WiCare room view (?room=1): standing beside the bed, falls 1.5-2.4 s, then stays on the floor (no repeat).
   // ========================================================================
 
   _standFall(t) {
     const n = _getNoiseBank('stand_fall');
-    t = t % 15;
-    const T0 = 7, T1 = 8;
+    const T0 = 1.5, T1 = 2.4;
     const inFall = t >= T0 && t < T1, down = t >= T1;
     const k = inFall ? (t - T0) / (T1 - T0) : down ? 1 : 0;
-    const bx = 3.5 + WAKE_BED.dx, bz = -3.5 + WAKE_BED.dz;
-    const pose = t < T0 ? 'waking' : 'bedfall';
-    const ms = inFall ? 255 : down ? 2 + Math.abs(n.motion(t)) : 4;
+    const { x, z } = FALL_SPOT;
+    const pose = down ? 'fallen' : inFall ? 'falling' : 'standing';
+    const ms = inFall ? 255 : down ? 2 + Math.abs(n.motion(t)) : 12;
     const impact = inFall ? Math.sin(k * Math.PI) : 0;
     const amplitude = new Float32Array(64);
     for (let i = 0; i < 64; i++) amplitude[i] = (down ? 0.15 : 0.3) + impact * 0.5 + _harmonicNoise(t, i * 0.19, 2) * 0.01;
@@ -618,10 +620,9 @@ export class DemoDataGenerator {
       features: { mean_rssi: -43, variance: down ? 0.5 : 1.5 + impact * 6, std: 1, motion_band_power: inFall ? 0.9 : 0.03,
         breathing_band_power: 0.1, dominant_freq_hz: inFall ? 3.5 : 0.2, spectral_power: inFall ? 0.9 : 0.15 },
       classification: { motion_level: inFall ? 'active' : 'present_still', presence: true, confidence: 0.8, fall_detected: inFall || down },
-      signal_field: { grid_size: [20, 1, 20], values: this._presenceField(10 + bx, 10 + bz, 2, t) },
+      signal_field: { grid_size: [20, 1, 20], values: this._presenceField(10 + x, 10 + z, 2, t) },
       vital_signs: { breathing_rate_bpm: down ? 22 : 13, heart_rate_bpm: down ? 104 : 64, breathing_confidence: 0.8, heart_rate_confidence: 0.7 },
-      persons: [{ id: 'p0', position: [bx, k > 0.5 ? 0.05 : 0.5, bz + 0.6 * k], motion_score: ms, pose, wake: 0, facing: 0,
-        fallProgress: k }],
+      persons: [{ id: 'p0', position: [x, 0, z], motion_score: ms, pose, facing: FALL_SPOT.facing, fallProgress: k }],
       estimated_persons: 1,
     });
   }

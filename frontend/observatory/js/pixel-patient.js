@@ -1,16 +1,14 @@
 /**
  * WiCare room view (?room=1): the patient as a pixel-style (blocky) man in a hospital gown, replacing the line figure.
- * Follows the room story from demo-data.js 'stand_fall': lying in bed, rolls off the near edge, face down on the floor.
- *   data.persons[0].pose: 'waking' (in bed) or 'bedfall'; data.persons[0].fallProgress: 0 in bed .. 1 on the floor.
- * Bed geometry matches scenario-props.js _buildHospital (centre -1.5, -2.5; mattress top 0.53; head toward -x).
+ * Follows the room story from demo-data.js 'stand_fall': standing beside the bed, falls forward, face down on the floor.
+ *   data.persons[0].fallProgress: 0 standing .. 1 on the floor.
+ * Bed geometry matches scenario-props.js _buildHospital (centre -1.5, -2.5; front edge z -1.9).
  */
 import * as THREE from 'three';
-import { WAKE_BED } from './pose-system.js';
+import { FALL_SPOT } from './demo-data.js';
 
-const BX = 3.5 + WAKE_BED.dx, BZ = -3.5 + WAKE_BED.dz, MATTRESS_TOP = 0.53;
 const S = 0.9, HALF_DEPTH = 0.13 * S;
-const HIP_BED = MATTRESS_TOP + HALF_DEPTH + 0.01;
-const EDGE_Y = MATTRESS_TOP, EDGE_Z = BZ + 0.46;
+const HIP = 0.85 * S;                                  // hip height when standing (feet on the floor)
 
 const SKIN = '#e8c4ab', SKIN_D = '#c99f86', HAIR = '#5a3a24', HAIR_D = '#3f2717';
 const GOWN = '#93b4cf', GOWN_D = '#5a84ad', GOWN_L = '#a9c5dc', SOCK = '#6d8fcf', SOCK_D = '#5675b3', CAP = '#86b0d8';
@@ -59,12 +57,11 @@ function block(w, h, d, m, x, y, z, parent) {
   b.position.set(x, y, z); b.castShadow = true; b.receiveShadow = true; parent.add(b); return b;
 }
 const ss = (a, b, t) => { const x = Math.min(1, Math.max(0, (t - a) / (b - a))); return x * x * (3 - 2 * x); };
-const mix = (a, b, k) => a + (b - a) * k;
 
 export class PixelPatient {
   constructor(scene) {
-    this.rig = new THREE.Group();                      // pivot on the mattress edge for the roll off the bed
-    this.root = new THREE.Group(); this.root.rotation.order = 'YXZ';
+    this.rig = new THREE.Group(); this.rig.rotation.order = 'YXZ';   // pivot at the feet: the body tips forward from here
+    this.root = new THREE.Group(); this.root.position.y = HIP;
     this.rig.add(this.root); scene.add(this.rig);
     const body = new THREE.Group(); body.scale.setScalar(S); this.root.add(body);
 
@@ -97,26 +94,25 @@ export class PixelPatient {
     });
   }
 
-  /** k: 0 lying in bed .. 1 face down on the floor beside it. */
+  /** k: 0 standing .. 1 face down on the floor. */
   set(k, breath, twitch = 0) {
-    const e = k * k * (3 - 2 * k), flail = Math.sin(k * Math.PI);
-    this.rig.position.set(0, mix(EDGE_Y, HALF_DEPTH + 0.02 + (HIP_BED - EDGE_Y), e), EDGE_Z + 0.15 * e);
-    this.rig.rotation.x = Math.PI * e;
-    this.root.position.set(BX - 0.05, HIP_BED - EDGE_Y, BZ - EDGE_Z);
-    this.root.rotation.set(-Math.PI / 2, Math.PI / 2, 0);   // on the back, head toward the headboard
-    this.torso.rotation.x = k === 0 ? breath * 0.015 : 0;
-    this.head.rotation.x = -0.3 * flail;
-    this.arms[0].rotation.set(-1.2 * flail + twitch, 0, -(0.5 * flail + 0.12 * k));
-    this.arms[1].rotation.set(-0.9 * flail, 0, 0.5 * flail + 0.12 * k);
-    this.legs[0].thigh.rotation.x = -0.5 * flail; this.legs[1].thigh.rotation.x = -0.2 * flail;
-    this.legs[0].shin.rotation.x = 0.6 * flail; this.legs[1].shin.rotation.x = 0;
+    const e = k * k, flail = Math.sin(k * Math.PI), sway = (1 - Math.min(1, k * 4)) * breath;
+    this.rig.position.set(FALL_SPOT.x, (HALF_DEPTH + 0.02) * e, FALL_SPOT.z);
+    this.rig.rotation.set(Math.PI / 2 * e, FALL_SPOT.facing, sway * 0.02);
+    this.torso.rotation.x = sway * 0.015 + 0.25 * flail;                 // folds at the waist on the way down
+    this.head.rotation.set(-0.3 * flail, 0.9 * e, 0);                    // ends with the face turned to one side
+    // arms come forward to break the fall, then lie out to the sides
+    this.arms[0].rotation.set(-1.3 * flail, 0, -(1.25 * e + twitch));
+    this.arms[1].rotation.set(-1.0 * flail, 0, 0.9 * e);
+    this.legs[0].thigh.rotation.set(-0.55 * flail, 0, -0.12 * e); this.legs[1].thigh.rotation.set(-0.3 * flail, 0, 0.1 * e);
+    this.legs[0].shin.rotation.x = 0.9 * flail; this.legs[1].shin.rotation.x = 0.5 * flail;   // knees buckle
   }
 
   update(data, elapsed) {
     const p = data && data.persons && data.persons[0];
-    const k = p && p.pose === 'bedfall' ? Math.max(0, Math.min(1, p.fallProgress || 0)) : 0;
+    const k = p ? Math.max(0, Math.min(1, p.fallProgress || 0)) : 0;
     const onFloorFor = k >= 1 ? (this._downAt ??= elapsed, elapsed - this._downAt) : (this._downAt = null, 0);
-    const twitch = onFloorFor > 2 && onFloorFor < 2.6 ? Math.sin((onFloorFor - 2) * 10) * 0.25 : 0;
+    const twitch = onFloorFor > 2 && onFloorFor < 2.6 ? Math.sin((onFloorFor - 2) * 10) * 0.12 : 0;
     this.set(k, Math.sin(elapsed * Math.PI * 0.5), twitch);
   }
 }

@@ -1,9 +1,9 @@
 # WiCare room view
 
 `index.html?room=1` is the 3D room the nurse sees after replying 1: a hospital bed, a pixel-style patient in a gown
-(`observatory/js/pixel-patient.js`), a fall out of bed and a FALL DETECTED banner. `python run.py` (one folder up)
-serves it at `http://localhost:8000/room`. Timing: in bed 0-7 s, falls 7-8 s, on the floor until 15 s, then repeats
-(`&t=6` jumps to just before the fall).
+(`observatory/js/pixel-patient.js`) who falls to the floor, and a FALL DETECTED banner. `python run.py` (one folder
+up) serves it at `http://localhost:8000/room`. Timing: standing 0-1.5 s, falls 1.5-2.4 s, then stays on the floor
+(it plays once; reload to see it again).
 
 The rest of this file describes the earlier single-room page (the same files without `?room=1`).
 

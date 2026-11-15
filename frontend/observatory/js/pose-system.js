@@ -38,7 +38,6 @@ export class PoseSystem {
       case 'crouching':   kps = this.poseCrouching(px, pz, elapsed, bp); break;
       case 'walking':     kps = this.poseWalking(px, pz, elapsed, ms, bp); break;
       case 'waking':      kps = this.poseWaking(person.wake || 0, elapsed, bp); break;
-      case 'bedfall':     kps = this.poseBedFall(person.fallProgress || 0, elapsed, bp); break;
       case 'standing':
       default:            kps = this.poseStanding(px, pz, elapsed, ms, bp); break;
     }
@@ -80,23 +79,6 @@ export class PoseSystem {
     const chest = bp * 0.012 * (1 - w / 3);
     for (const k of [5, 6, 11, 12]) out[k][1] += chest;
     return out;
-  }
-
-  /** WiCare room view: lying on the bed, rolls over the near edge (z + 0.45) and lands face down on the floor.
-   *  k: 0 = in bed, 1 = on the floor. Half a turn about the mattress edge while the edge drops to the floor. */
-  poseBedFall(k, elapsed, bp) {
-    const keys = PoseSystem._wakeKeys || (PoseSystem._wakeKeys = this._buildWakeKeys());
-    const e = k * k * (3 - 2 * k), th = Math.PI * e, c = Math.cos(th), s = Math.sin(th);
-    const ez = -3.5 + WAKE_BED.dz + 0.45, ey = 0.53;
-    const py = ey + (0.2 - ey) * e, pz = ez + 0.15 * e;
-    const flail = Math.sin(k * Math.PI) * 0.18, settle = k >= 1 ? 0 : 1;
-    return keys[0].map(([x, y, z], i) => {
-      const dy = y - ey, dz = z - ez;
-      const out = [x, py + dy * c - dz * s, pz + dy * s + dz * c];
-      if (i >= 7 && i <= 10) out[1] += flail * settle;                 // arms flail on the way down
-      if (k <= 0 && (i === 5 || i === 6 || i === 11 || i === 12)) out[1] += bp * 0.012;
-      return out;
-    });
   }
 
   _wakeStanding(elapsed, bp) {

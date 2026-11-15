@@ -16,8 +16,8 @@
 
 ## What it does
 
-WiCare uses the Wi-Fi waves already in a hospital room to notice abnormal movement, like a patient falling out
-of bed. There is no camera in the room and nothing for the patient to wear.
+WiCare uses the Wi-Fi waves already in a hospital room to notice abnormal movement, like a patient falling to
+the floor. There is no camera in the room and nothing for the patient to wear.
 
 When a person moves, the Wi-Fi signal in the room changes. A fall changes it in a specific way: a sudden burst
 of movement, then stillness. WiCare watches for that pattern. When it sees one, it texts the nurse through
@@ -47,9 +47,9 @@ After 8 seconds of stillness the monitor turns red and the nurse gets this text 
 
 The room stays private until the nurse asks to see it. Before that, the screen shows only a line on a chart.
 
-| Before | After the fall |
+| Just before | After the fall |
 |---|---|
-| <img src="docs/images/room-bed.png" alt="Room view: the patient lying in a hospital bed" width="440"> | <img src="docs/images/room-fall.png" alt="Room view: the patient on the floor beside the bed, FALL DETECTED" width="440"> |
+| <img src="docs/images/room-before.png" alt="Room view: the patient standing beside a hospital bed" width="440"> | <img src="docs/images/room-fall.png" alt="Room view: the patient on the floor beside the bed, FALL DETECTED" width="440"> |
 
 ## How it detects a fall from Wi-Fi
 
@@ -95,7 +95,8 @@ meant to be empty.
 conversation for the nurse's answer. **1** opens the room view on the monitor screen; **2** clears the alarm and
 logs a false alarm.
 
-**7. The room view.** A 3D room: hospital bed, the patient in a gown, the fall, and **FALL DETECTED** across the top.
+**7. The room view.** A 3D room: hospital bed, the patient in a gown falling to the floor, and **FALL DETECTED**
+across the top.
 
 ### What about vitals?
 
