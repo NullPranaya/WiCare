@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WiCare · All rooms</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+  <link id="favicon" rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#0E7A80">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="replay-banner" class="replay-banner" hidden>Replay of a recorded session — not live</div>
+
+  <header class="top">
+    <h1 class="brand"><img class="logo" src="/static/logo.svg" alt="">WiCare <span class="room">All rooms</span></h1>
+    <p id="ward-summary" class="ward-summary" aria-live="polite">6 beds</p>
+  </header>
+
+  <main>
+    <ul class="ward" aria-label="Beds">
+      <li>
+        <a id="bed-live" href="/" class="bed bed-link" data-state="CONNECTING">
+          <span class="bed-head"><span class="bed-name">Bed 1</span><span class="bed-room">Room 101</span></span>
+          <span class="bed-word" id="live-word">Connecting…</span>
+          <span class="bed-note" id="live-note">Waiting for the WiCare app</span>
+          <canvas class="spark" id="live-spark" aria-hidden="true"></canvas>
+          <span class="bed-foot">
+            <span id="live-sensors" class="bed-sensors"><span class="dot"></span>No sensors yet</span>
+            <span class="bed-open">Open dashboard <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </span>
+        </a>
+      </li>
+      <li>
+        <div class="bed" data-state="MONITORING">
+          <span class="bed-head"><span class="bed-name">Bed 2</span><span class="bed-room">Room 102</span></span>
+          <span class="bed-word">Monitoring</span>
+          <span class="bed-note">Watching for unusual movements</span>
+          <canvas class="spark" data-profile="calm" aria-hidden="true"></canvas>
+          <span class="bed-foot"><span class="bed-sensors"><span class="dot on"></span>2 sensors online</span></span>
+        </div>
+      </li>
+      <li>
+        <div class="bed" data-state="MOVEMENT">
+          <span class="bed-head"><span class="bed-name">Bed 3</span><span class="bed-room">Room 103</span></span>
+          <span class="bed-word">Moving</span>
+          <span class="bed-note">Ongoing movement. Not the fall pattern.</span>
+          <canvas class="spark" data-profile="moving" aria-hidden="true"></canvas>
+          <span class="bed-foot"><span class="bed-sensors"><span class="dot on"></span>2 sensors online</span></span>
+        </div>
+      </li>
+      <li>
+        <div class="bed" data-state="MONITORING">
+          <span class="bed-head"><span class="bed-name">Bed 4</span><span class="bed-room">Room 104</span></span>
+          <span class="bed-word">Monitoring</span>
+          <span class="bed-note">Watching for unusual movements</span>
+          <canvas class="spark" data-profile="calm" aria-hidden="true"></canvas>
+          <span class="bed-foot"><span class="bed-sensors"><span class="dot on"></span>2 sensors online</span></span>
+        </div>
+      </li>
+      <li>
+        <div class="bed" data-state="PAUSED">
+          <span class="bed-head"><span class="bed-name">Bed 5</span><span class="bed-room">Room 105</span></span>
+          <span class="bed-word">Alerts paused</span>
+          <span class="bed-note">Patient out of bed</span>
+          <canvas class="spark" data-profile="paused" aria-hidden="true"></canvas>
+          <span class="bed-foot"><span class="bed-sensors"><span class="dot on"></span>2 sensors online</span></span>
+        </div>
+      </li>
+      <li>
+        <div class="bed" data-state="MONITORING">
+          <span class="bed-head"><span class="bed-name">Bed 6</span><span class="bed-room">Room 106</span></span>
+          <span class="bed-word">Monitoring</span>
+          <span class="bed-note">Watching for unusual movements</span>
+          <canvas class="spark" data-profile="calm" aria-hidden="true"></canvas>
+          <span class="bed-foot"><span class="bed-sensors"><span class="dot on"></span>1 sensor online</span></span>
+        </div>
+      </li>
+    </ul>
+  </main>
+
+  <script src="/static/ward.js"></script>
+</body>
+</html>

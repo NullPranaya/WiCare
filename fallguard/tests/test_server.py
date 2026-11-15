@@ -320,7 +320,14 @@ def test_room_page_served(tmp_path):
     assert response.status_code == 200 and "Room view" in response.text
 
 
-@pytest.mark.parametrize("path", ["/", "/static/app.js", "/static/style.css", "/room"])
+def test_ward_page_links_bed_one_to_dashboard(tmp_path):
+    with TestClient(build(tmp_path, [])) as client:
+        response = client.get("/ward")
+    assert response.status_code == 200
+    assert 'id="bed-live" href="/"' in response.text and "/static/ward.js" in response.text
+
+
+@pytest.mark.parametrize("path", ["/", "/static/app.js", "/static/style.css", "/room", "/ward", "/static/ward.js"])
 def test_pages_and_assets_are_revalidated(tmp_path, path):
     with TestClient(build(tmp_path, [])) as client:
         response = client.get(path)

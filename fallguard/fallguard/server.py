@@ -266,6 +266,11 @@ def create_app(
     async def index() -> FileResponse:
         return FileResponse(STATIC_DIR / "index.html", headers=NO_CACHE)
 
+    @app.get("/ward")
+    async def ward() -> FileResponse:
+        """All six beds at a glance. Bed 1 is live; the other five are simulated for the demo."""
+        return FileResponse(STATIC_DIR / "ward.html", headers=NO_CACHE)
+
     @app.websocket("/ws")
     async def ws(socket: WebSocket) -> None:
         await socket.accept()
