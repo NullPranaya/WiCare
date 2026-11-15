@@ -28,3 +28,8 @@ def test_parses_two_boards_and_overrides():
 def test_rejects_bad_board_entry():
     with pytest.raises(ValueError):
         load_config({"FALLGUARD_BOARDS": "no-equals-sign"}, Path("/x"))
+
+
+def test_host_defaults_to_all_interfaces_and_can_be_overridden(tmp_path):
+    assert load_config({}, tmp_path).host == "0.0.0.0"
+    assert load_config({"FALLGUARD_HOST": "127.0.0.1"}, tmp_path).host == "127.0.0.1"

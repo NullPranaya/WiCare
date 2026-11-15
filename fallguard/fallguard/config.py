@@ -27,6 +27,7 @@ class AppConfig:
     cooldown_s: float = 60.0
     nurse_phone: str | None = None
     port: int = 8000
+    host: str = "0.0.0.0"  # dashboard reachable from other devices on the same network
 
 
 def _parse_boards(raw: str) -> tuple[tuple[str, str], ...]:
@@ -59,4 +60,5 @@ def load_config(env: Mapping[str, str], base_dir: Path) -> AppConfig:
         cooldown_s=float(env.get("FALLGUARD_COOLDOWN_S", 60.0)),
         nurse_phone=(env.get("NURSE_PHONE") or "").strip() or None,
         port=int(env.get("FALLGUARD_PORT", 8000)),
+        host=(env.get("FALLGUARD_HOST") or "0.0.0.0").strip(),
     )
