@@ -248,6 +248,35 @@ function renderBoards() {
 const canvas = $("chart");
 const ctx = canvas.getContext("2d");
 
+const PLOT_LEFT = 62; // room for the score axis on the left
+const SCORE_TICKS = [0, 0.25, 0.5, 0.75, 1];
+document.querySelector(".axis").style.paddingLeft = `${PLOT_LEFT}px`;
+
+function drawScoreAxis(w, h, y) {
+  ctx.font = "13px 'Atkinson Hyperlegible', sans-serif";
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = color("--line");
+  ctx.fillStyle = color("--quiet");
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  for (const v of SCORE_TICKS) {
+    ctx.beginPath();
+    ctx.moveTo(PLOT_LEFT, Math.round(y(v)) + 0.5);
+    ctx.lineTo(w, Math.round(y(v)) + 0.5);
+    ctx.stroke();
+    ctx.fillText(v === 0 || v === 1 ? String(v) : v.toFixed(2), PLOT_LEFT - 8, y(v));
+  }
+  ctx.save();
+  ctx.translate(12, (y(0) + y(1)) / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = "center";
+  ctx.font = "700 13px 'Atkinson Hyperlegible', sans-serif";
+  ctx.fillText("Motion score", 0, 0);
+  ctx.restore();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+}
+
 function draw() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.clientWidth;
@@ -261,9 +290,15 @@ function draw() {
 
   const now = serverNow();
   const t0 = now - WINDOW_S;
-  const x = (t) => ((t - t0) / WINDOW_S) * w;
+  const x = (t) => PLOT_LEFT + ((t - t0) / WINDOW_S) * (w - PLOT_LEFT);
   const pad = 14;
   const y = (v) => h - pad - v * (h - 2 * pad);
+
+  drawScoreAxis(w, h, y);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(PLOT_LEFT, 0, w - PLOT_LEFT, h);
+  ctx.clip(); // bands and traces stay inside the plot, clear of the axis labels
 
   // bands
   for (const band of app.bands) {
@@ -286,7 +321,7 @@ function draw() {
   ctx.setLineDash([6, 5]);
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(0, y(app.config.threshold));
+  ctx.moveTo(PLOT_LEFT, y(app.config.threshold));
   ctx.lineTo(w, y(app.config.threshold));
   ctx.stroke();
   ctx.setLineDash([]);
@@ -314,6 +349,7 @@ function draw() {
     }
     ctx.stroke();
   }
+  ctx.restore();
 
   render();
   requestAnimationFrame(draw);
