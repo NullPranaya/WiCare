@@ -29,23 +29,57 @@ sound a siren. It **texts the nurse over iMessage** (through [Photon](https://ph
 
 The room stays private until the nurse asks to see it. Before that, the screen shows only a line on a chart.
 
-## How it works
+## How it detects a fall from Wi-Fi
 
 ```
- Wi-Fi motion score ──> WiCare monitor ──> fall rule ──> Photon iMessage ──> nurse's phone
-   (boards, or the        (live chart,       (burst,        "possible fall,        │
-    control page)          Bed 1)             then           reply 1 or 2")        │ replies 1
-                                              stillness)                           ▼
-                                                              3D room view opens on the monitor screen
+  Wi-Fi router ))) ~~ signal bounces off walls, furniture and the patient ~~ ))) ESP32 board(s)
+                                                                                  │ motion score, 4 times a second
+                                                                                  ▼
+       nurse's phone <── Photon iMessage <── fall rule <── WiCare monitor (live chart, Bed 1)
+            │ replies 1
+            ▼
+       3D room view opens on the monitor screen
 ```
 
-1. **The monitor.** WiCare's dashboard shows Bed 1's motion score live, four readings a second, with the alert
-   line drawn across the chart. A second page shows the whole ward.
-2. **The rule.** Score above the line for at most 3 seconds, then below it for 8 seconds: possible fall.
-   Longer movement is treated as someone walking around, and never alerts.
-3. **The text.** WiCare sends the alert through Photon's iMessage API and keeps checking Photon for the nurse's reply.
-4. **The room view.** On reply **1**, the dashboard switches to a 3D room: a hospital bed, a patient in a gown,
-   and the fall played out, with **FALL DETECTED** across the top.
+**1. The signal.** A Wi-Fi signal is not one wave. It is split across dozens of narrow frequency channels
+(subcarriers), and each one reaches the receiver along many paths: straight across the room, off the walls, off
+the bed, off the person. A small ESP32 board can report how strong each subcarrier arrived, packet by packet.
+This is called channel state information (CSI).
+
+**2. Movement.** In an empty or still room those readings barely change. When a body moves, the paths that bounce
+off it change length, and the subcarriers rise and fall in a pattern. Bigger and faster movement means bigger
+swings. The boards run ESPectre firmware, which turns those swings into a single **motion score**, sent to WiCare
+four times a second. No image, no audio and no identity is ever captured, only how much the signal is changing.
+
+**3. The shape of a fall.** Walking keeps the score high for a long time. Rolling over in bed is a small bump.
+A fall is different: **a sharp burst, then nothing.** WiCare's rule looks for exactly that:
+
+| Step | What WiCare looks for | On the monitor |
+|---|---|---|
+| Burst | score above the alert line (0.962) for at most 3 s | Sudden movement |
+| Stillness | score stays below the line for 8 s | Stillness |
+| Alert | both happened, in that order | Possible fall, text sent |
+
+Movement that lasts longer than 3 s is treated as someone up and about, and never alerts.
+
+**4. More than one board.** With two boards in the room, a burst only counts if **every** board sees it, so one
+noisy sensor cannot raise an alarm on its own.
+
+**5. Failing safe.** If a board goes quiet for more than 1.5 s, the monitor says **No signal** instead of
+guessing. Missing data is never counted as stillness. A "Patient in bed" switch turns alerts off when the bed is
+meant to be empty.
+
+**6. The text and the reply.** WiCare sends the alert through Photon's iMessage API, then keeps reading the
+conversation for the nurse's answer. **1** opens the room view on the monitor screen; **2** clears the alarm and
+logs a false alarm.
+
+**7. The room view.** A 3D room: hospital bed, the patient in a gown, the fall, and **FALL DETECTED** across the top.
+
+### What about vitals?
+
+WiCare does not measure vital signs today. The same Wi-Fi readings can carry them, because breathing moves the
+chest a few millimetres at a steady rhythm and that shows up as a slow, regular ripple in the signal. Reading
+breathing rate from that ripple, and alerting when it changes, is the next thing we want to build.
 
 ## Run it
 
@@ -55,42 +89,35 @@ Everything runs from one laptop with one command.
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env          # then fill in the Photon values below
-python run.py
+python run.py --boards        # reads the ESP32 boards listed in wicare/fallguard/.env
 ```
-
-`run.py` prints the addresses to open:
 
 | What | Where |
 |---|---|
-| Monitor (show this screen) | `http://localhost:8000/` |
+| Monitor | `http://localhost:8000/` |
 | All rooms | `http://localhost:8000/ward` |
 | Room view (opens by itself on reply 1) | `http://localhost:8000/room` |
-| Control page | the link `run.py` prints, for a teammate on any network |
 
 In `.env`: `CAREGIVER_ADDRESS` (the nurse's phone, like `+15551234567`), `PHOTON_PROJECT_ID` and
 `PHOTON_PROJECT_API_KEY`. The nurse's phone must have texted the Photon line once, so Photon is allowed to
 message it. Node.js is needed for the sender (`wicare/fallguard/notify/send.mjs`).
 
-**Where the motion score comes from.** WiCare reads ESP32 boards running ESPectre firmware
-(`python run.py --boards`, addresses in `wicare/fallguard/.env`). Without boards, the **control page** supplies
-the score in the same format, so the rest of the system runs exactly the same: "Send alert" plays a sudden
-movement and then stillness.
+Without boards, `python run.py` runs the monitor on a simulated signal, so the alert, the text, the reply and the
+room view can all be tried without hardware.
 
-**Tips**
-- After an alert, WiCare holds the alarm until the nurse replies or someone presses Acknowledge
-  (or "Reset alarm" on the control page). It will not alert again until then.
-- Options: `--no-tunnel` (no public control link), `--port`, `--cooldown` (seconds between alerts, default 5).
+After an alert, WiCare holds the alarm until the nurse replies or someone presses Acknowledge.
 
 ## What is in this repository
 
 ```
-run.py           starts everything: WiCare's app, the room view, the control page, the public control link
+run.py           starts everything: WiCare's app and the room view
 wicare/          the team's WiCare app, exactly as in github.com/duna-akin/WiCare:
-                 monitor dashboard, ward page, fall rule, Photon sender, reply reader
+                 monitor dashboard, ward page, board reader, fall rule, Photon sender, reply reader
 frontend/        the 3D room view (index.html?room=1): bed, patient, fall, built on three.js
-remote/          the control page, which stands in for a board
+remote/          simulated board signal, for running without hardware
 backend/ ml/ monitoring/ photon/ sensors/ investigation/ sim/ evaluation/ models/ tests/
-                 our earlier research code (Wi-Fi signal models and a first messaging pipeline); not used by run.py
+                 our earlier research code (models trained on raw Wi-Fi recordings and a first messaging
+                 pipeline); not used by run.py
 ```
 
 ## Honest limits
