@@ -87,7 +87,8 @@ button:hover { background: #fff; }
 .ack:focus-visible { outline-color: #fff; }
 
 @media (prefers-reduced-motion: no-preference) {
-  .alarm:not([hidden]) .alarm-title { animation: beat 1.2s ease-in-out infinite; }
+  .alarm:not([hidden]) .alarm-title,
+  .alarm:not([hidden]) .alarm-mark { animation: beat 1.2s ease-in-out infinite; }
 }
 @keyframes beat { 50% { opacity: .55; } }
 
@@ -102,3 +103,4 @@ button:hover { background: #fff; }
 .brand { display: flex; align-items: center; gap: .5rem; }
 .brand .room { margin-left: 0; }
 .logo { width: 1.75rem; height: 1.75rem; flex: none; }
+.alarm-mark { display: block; width: clamp(5rem, 10vw, 8rem); height: auto; margin: 0 auto 1.25rem; }
