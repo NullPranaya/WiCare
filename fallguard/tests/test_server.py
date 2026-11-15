@@ -72,7 +72,7 @@ def test_fall_flow_broadcasts_state_and_alert_once(tmp_path):
     falls = [m for m in seen if m["type"] == "state" and m["state"] == "FALL"]
     alerts = [m["imessage"] for m in seen if m["type"] == "alert"]
     assert len(falls) == 1 and alerts == ["sending", "sent"]
-    assert sent == ["FallGuard: possible fall detected at 14:32:05. Patient has been still for 8 s after a sudden movement."]
+    assert sent == ["WiCare: possible fall detected at 14:32:05. Patient has been still for 8 s after a sudden movement."]
 
 
 def test_board_state_label_is_ignored(tmp_path):
@@ -160,7 +160,7 @@ def test_new_socket_gets_board_snapshot(tmp_path):
 def test_index_served(tmp_path):
     with TestClient(build(tmp_path, [])) as client:
         response = client.get("/")
-    assert response.status_code == 200 and "FallGuard" in response.text
+    assert response.status_code == 200 and "WiCare" in response.text
 
 
 def test_websocket_library_installed_for_uvicorn():

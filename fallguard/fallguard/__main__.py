@@ -59,7 +59,7 @@ def main() -> None:
     config, app = build_app(args.replay)
     port = args.port or config.port
     shown = lan_address() if config.host in ("0.0.0.0", "") else config.host
-    print(f"FallGuard dashboard: http://{shown}:{port}/", flush=True)
+    print(f"WiCare dashboard: http://{shown}:{port}/", flush=True)
     uvicorn.run(app, host=config.host, port=port, log_level="warning")
 
 
