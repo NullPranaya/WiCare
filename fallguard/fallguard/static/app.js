@@ -118,9 +118,9 @@ function render() {
       note.textContent = "No data from the Wi-Fi sensor for over 1.5 s. Check the board and the hotspot.";
       break;
     default:
-      word.textContent = s.armed ? "Monitoring" : "Alerts paused";
+      word.textContent = s.armed ? "Private Wifi Wave Monitoring" : "Alerts paused";
       note.textContent = s.armed
-        ? "Watching for a sudden movement followed by stillness."
+        ? "Watching for unusual movements"
         : "Turn on “Patient in bed” to resume fall alerts.";
   }
 
