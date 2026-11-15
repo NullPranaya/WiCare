@@ -2,11 +2,11 @@
 
 # WiCare
 
-### Wi-Fi fall detection that texts the nurse, and shows the room when they ask.
-
-*No cameras. No wearables. A Wi-Fi signal, a text message, and a reply.*
+### Uses Wi-Fi waves to detect when a patient falls, without using a camera, and texts the nurse.
 
 **HackPrinceton Fall 2026 · Photon track**
+
+<img src="docs/images/room-fall.png" alt="WiCare room view: a patient on the floor beside a hospital bed, with a FALL DETECTED banner" width="900">
 
 </div>
 
@@ -14,20 +14,40 @@
 
 ## What it does
 
-A patient is alone in a room. If they fall, somebody has to find out, and nobody wants a camera pointed at a
-hospital bed.
+WiCare uses the Wi-Fi waves already in a hospital room to notice abnormal movement, like a patient falling out
+of bed. There is no camera in the room and nothing for the patient to wear.
 
-WiCare watches the room's **Wi-Fi signal** instead. Movement in a room disturbs the signal, and a fall has a
-recognisable shape: **a sudden burst of movement, then stillness.** When WiCare sees that shape, it does not
-sound a siren. It **texts the nurse over iMessage** (through [Photon](https://photon.codes)) and asks what to do:
+When a person moves, the Wi-Fi signal in the room changes. A fall changes it in a specific way: a sudden burst
+of movement, then stillness. WiCare watches for that pattern. When it sees one, it texts the nurse through
+[Photon](https://photon.codes) (iMessage) and asks what to do. If the nurse wants to look, one reply opens a 3D
+view of the room.
 
-> WiCare: possible fall detected at 21:04:12. Patient has been still for 8 s after a sudden movement.
+### 1. WiCare watches the Wi-Fi signal
+
+The monitor shows how much the signal in Bed 1's room is changing, four times a second. Here it has just seen a
+sudden movement and is counting the stillness that follows.
+
+<img src="docs/images/monitor.png" alt="WiCare monitor: a spike above the alert line, then a flat line, with the status Stillness 4 of 8 s" width="900">
+
+### 2. It raises the alarm and texts the nurse
+
+After 8 seconds of stillness the monitor turns red and the nurse gets this text on their phone:
+
+> WiCare: possible fall detected at 00:54:07. Patient has been still for 8 s after a sudden movement.
 > Reply 1 to acknowledge, 2 to ignore.
 
-- The nurse replies **1**: the screen opens the **room view**, a 3D picture of the bed and the patient on the floor.
-- The nurse replies **2**: the alert is dismissed as a false alarm.
+<img src="docs/images/alarm.png" alt="WiCare alarm screen: Possible fall. Sudden movement for 1.8 s, then still for 8 s. Nurse alerted, waiting for their reply" width="900">
+
+### 3. The nurse replies, and the room opens
+
+- Reply **1**: the screen opens the room view below, so the nurse can see what happened.
+- Reply **2**: the alert is dismissed as a false alarm.
 
 The room stays private until the nurse asks to see it. Before that, the screen shows only a line on a chart.
+
+| Before | After the fall |
+|---|---|
+| <img src="docs/images/room-bed.png" alt="Room view: the patient lying in a hospital bed" width="440"> | <img src="docs/images/room-fall.png" alt="Room view: the patient on the floor beside the bed, FALL DETECTED" width="440"> |
 
 ## How it detects a fall from Wi-Fi
 
@@ -127,6 +147,7 @@ backend/ ml/ monitoring/ photon/ sensors/ investigation/ sim/ evaluation/ models
 - The 3D room view is an animation that plays when the nurse opens the room. It is not reconstructed from the
   Wi-Fi signal.
 - Beds 2 to 6 on the ward page are simulated by the dashboard; Bed 1 is the live one.
+- The pictures above were taken with the simulated signal, not with boards in a patient's room.
 
 ## Credits
 
