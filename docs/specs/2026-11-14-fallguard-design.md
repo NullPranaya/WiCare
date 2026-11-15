@@ -93,21 +93,17 @@ motion score; raw-CSI recording and ML come after the end-to-end demo works.
 
 ### Photon (iMessage)
 
-- The team has a Photon cloud (Stable / Spectrum) account.
-- Sending uses the TypeScript SDK `spectrum-ts` with `SPECTRUM_PROJECT_ID` and
-  `SPECTRUM_PROJECT_SECRET` (project Settings on app.photon.codes). The REST API has no send
-  endpoint, so the Python app calls a small Node script. Node 26 and npm are installed.
-- Minimal send, from the Photon docs:
-
-  ```ts
-  import { Spectrum } from "spectrum-ts";
-  import { imessage } from "spectrum-ts/providers/imessage";
-  const app = await Spectrum({ providers: [imessage.config()] }); // reads env credentials
-  const im = imessage(app);
-  const dm = await im.space.create(await im.user("+1XXXXXXXXXX"));
-  await dm.send("...");
-  await app.stop();
-  ```
+- The team has a Photon Beta (2.0) project (app.beta.photon.codes). Its IDs start with
+  `pho_prj_` and it does not work with the Stable `spectrum-ts` SDK or `spectrum.photon.codes`.
+- The Python app calls `notify/send.mjs`, a dependency-free Node script that uses the REST API at
+  `https://api.photon.codes/v1` with `SPECTRUM_PROJECT_ID` (`pho_prj_...`) and
+  `SPECTRUM_PROJECT_SECRET` (a `pho_sk_` project API key). Node 26 and npm are installed.
+- The project uses a shared iMessage line. The recipient must text the line once (opt-in) before
+  the line can message them. The send flow:
+  1. `GET /platforms/imessage/assignments`: find the recipient's opted-in assignment and its line number.
+  2. `POST /users` (create-or-get) for the recipient and for the line.
+  3. `POST /spaces` (create-or-get the direct chat, `Idempotency-Key` required).
+  4. `POST /messages` with `senderId`, `spaceId` and `{type: "text", format: "plain", text}`.
 
 - The free tier uses a shared line pool, so the sender number can vary.
 
@@ -131,7 +127,7 @@ motion score; raw-CSI recording and ML come after the end-to-end demo works.
 hackprinceton 2026/
   espectre-main/          upstream ESPectre 3.3.0-dev checkout, unmodified, git-ignored
   fallguard/              our app (Python), may import espectre-main code
-    notify/               Node script for Photon (spectrum-ts)
+    notify/               Node script for Photon (REST API)
   docs/specs/ this document
 ```
 
