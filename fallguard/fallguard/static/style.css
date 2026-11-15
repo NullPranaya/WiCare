@@ -98,3 +98,6 @@ button:hover { background: #fff; }
   .steps { margin: 0; flex-wrap: wrap; }
   .facts { grid-template-columns: 1fr; gap: 1.25rem; }
 }
+
+.back { margin-left: auto; font-size: 1.05rem; color: var(--ink); }
+.room-view { min-height: clamp(260px, 55vh, 640px); }

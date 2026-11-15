@@ -22,6 +22,7 @@ from fallguard.board import BoardHealth, BoardStatus, MotionSample
 from fallguard.config import AppConfig
 from fallguard.detector import FallDetector, Status, level_for
 from fallguard.fusion import Fusion
+from fallguard.room import router as room_router
 
 SampleSource = Callable[[], AsyncIterator[MotionSample | BoardStatus]]
 HealthSource = Callable[[], Awaitable[list[BoardHealth]]]
@@ -203,6 +204,7 @@ def create_app(
     app = FastAPI(lifespan=lifespan)
     app.state.engine = engine
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    app.include_router(room_router)
 
     @app.get("/")
     async def index() -> FileResponse:

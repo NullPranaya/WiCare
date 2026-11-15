@@ -234,3 +234,9 @@ def test_source_crash_reports_disconnect_and_restarts(tmp_path):
             _, seen = receive_until(ws, lambda m: m["type"] == "sample" and m["t"] == 99.0)
     crashed = [m for m in seen if m["type"] == "board" and not m["connected"] and "stream broke" in m["detail"]]
     assert crashed and runs["n"] == 2
+
+
+def test_room_page_served(tmp_path):
+    with TestClient(build(tmp_path, [])) as client:
+        response = client.get("/room")
+    assert response.status_code == 200 and "Room view" in response.text
