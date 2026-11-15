@@ -132,7 +132,7 @@ hackprinceton 2026/
   espectre-main/          upstream ESPectre 3.3.0-dev checkout, unmodified, git-ignored
   fallguard/              our app (Python), may import espectre-main code
     notify/               Node script for Photon (spectrum-ts)
-  docs/superpowers/specs/ this document
+  docs/specs/ this document
 ```
 
 The project root is a git repo. `.env` holds the Photon credentials, the recipient number,

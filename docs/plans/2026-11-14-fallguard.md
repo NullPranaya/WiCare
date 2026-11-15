@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.14, FastAPI, uvicorn, httpx, python-dotenv, pytest, and pytest-asyncio. Node 26 with `spectrum-ts`. Plain HTML/CSS/JS with a `<canvas>` graph, no build step.
 
-**Spec:** `docs/superpowers/specs/2026-11-14-fallguard-design.md`
+**Spec:** `docs/specs/2026-11-14-fallguard-design.md`
 
 ## Global Constraints
 
