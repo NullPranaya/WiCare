@@ -23,7 +23,7 @@ from fallguard.config import AppConfig
 from fallguard.detector import FallDetector, Status, level_for
 from fallguard.fusion import Fusion
 from fallguard.replies import Reply
-from fallguard.room import ROOM_PATH, mount_room_3d
+from fallguard.room import ROOM_PATH
 from fallguard.room import router as room_router
 
 SampleSource = Callable[[], AsyncIterator[MotionSample | BoardStatus]]
@@ -261,7 +261,6 @@ def create_app(
     app.state.engine = engine
     app.mount("/static", RevalidatedStaticFiles(directory=STATIC_DIR), name="static")
     app.include_router(room_router)
-    mount_room_3d(app)
 
     @app.get("/")
     async def index() -> FileResponse:
