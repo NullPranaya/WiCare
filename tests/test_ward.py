@@ -49,3 +49,31 @@ def test_screen_button_and_close(svc, monkeypatch):
     c.post('/ward/close')
     assert c.get('/ward/state').json()['alert'] is None
     assert '/ward/stress' in c.get('/ward/control').text
+
+def test_wicare_board_drives_stress_and_remote_overrides(svc):
+    w = svc.ward
+    t = 1000.0
+    for i in range(3):                                     # board below its threshold: calm
+        w.board_sample(0.3, t + i); w.tick(t + i)
+    assert w.source(t + 2) == 'board' and w.alert is None
+    t += 3
+    for i in range(3):                                     # board at 1.3 (> 0.962): alert after 1 s
+        w.board_sample(1.3, t + i); w.tick(t + i)
+    assert w.alert and w.alert['state'] == 'asked'
+    w.close(); w.armed = True
+    w.set_target(20, t=t + 4)                              # remote takes over even with the board streaming
+    for i in range(4, 8):
+        w.board_sample(1.3, t + i); w.tick(t + i)
+    assert w.source(t + 7) == 'remote' and w.alert is None
+
+def test_board_observations_reach_ward(svc):
+    svc.observe('esp32_01', 1.2, source='espectre_live')
+    assert svc.ward.source() == 'board'
+    svc.observe('esp32_01', 1.2, source='live_score')       # other sources do not feed the monitor
+
+def test_patient_checkins_off_leaves_only_the_room_question(svc):
+    from tests.conftest import feed_fall_like
+    svc.s.patient_checkins = False
+    ev = feed_fall_like(svc)
+    assert ev and not svc.event(ev['id'])['checkin_id']
+    assert not svc.db.q("SELECT * FROM messages WHERE role='patient'")

@@ -12,7 +12,7 @@
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-random%20forest-F7931E?logo=scikitlearn&logoColor=white)
 ![ESP32](https://img.shields.io/badge/ESP32-CSI%20sensing-E7352C?logo=espressif&logoColor=white)
 ![iMessage](https://img.shields.io/badge/Photon-iMessage-34C759?logo=apple&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-37%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-44%20passing-brightgreen)
 ![Paid APIs](https://img.shields.io/badge/paid%20APIs-0-blue)
 
 **HackPrinceton Fall 2026**
@@ -54,6 +54,46 @@ from recorded sensor data, with the IDs of the measurements it used.
 > [!NOTE]
 > AuraCare is a research prototype, tested only with consenting teammates and fictional patients. It is not a
 > medical device and makes no fall-detection, clinical or diagnostic claims. It asks. It never diagnoses.
+
+---
+
+## The private room demo (current, built on WiCare)
+
+> Work in progress: the team is still changing this flow. Edit this section freely.
+
+The room stays **private**: on screen it is a closed 3D room (roof, walls, door), and nobody is visible inside.
+Only a stress monitor shows outside the door.
+
+1. **Stress monitor.** The room's stress (0-100 demo index, not a medical measure) comes from the team's
+   **WiCare boards** ([duna-akin/WiCare](https://github.com/duna-akin/WiCare), merged into [`wicare/`](wicare)).
+   The board's motion score is scaled so its "strong movement" line (0.962) sits on the alert line (70).
+   A teammate can also drive it from a **remote** on their phone (`/ward/control`); moving the remote takes over from
+   the board for 30 s, and it is the source whenever no board is connected.
+2. **Alert.** Stress at 70+ (1 s from the board, 3 s from the remote): the room pops up red and the nurse's phone gets
+   > 🩺 **AuraCare | Ward Alert**
+   >
+   > Room 1's stress level is high (85). Do you want to check on them?
+   >
+   > Reply 1: YES
+   > Reply 2: NO
+3. **Reply 1.** The roof lifts, the front wall lowers and the camera goes in: the nurse sees the person's movement as
+   a stick figure (lying in bed 0-5 s, sits up at 5 s, gets up at 11 s, walks from 15 s) beside the stress chart and
+   the text thread. **Reply 2** dismisses it; it asks again only after stress drops below 50.
+
+```bash
+cd auracare && source .venv/bin/activate
+uvicorn backend.main:app --host 0.0.0.0 --port 8000      # run from this folder, not its parent
+python -m monitoring.espectre_worker                    # WiCare boards -> stress monitor (ESPECTRE_BOARDS in .env)
+cd frontend && python3 -m http.server 3000              # http://localhost:3000/ward/
+# remote:  http://<laptop-ip>:8000/ward/control  (phone on the same Wi-Fi)
+```
+Set `PATIENT_CHECKINS=0` in `.env` so the nurse only gets the 1/2 question (otherwise WiCare's fall rule also
+starts the older patient wellbeing check below). Other settings: `WARD_ROOMS` (1; 5 shows a ward of closed rooms),
+`WARD_LIVE_ROOM`, `WARD_REMOTE_HOLD_S`. Fallbacks on the screen: **Open room 1** (key O) and **Close room** (B).
+Details: [`frontend/README.md`](frontend/README.md), code: [`backend/ward.py`](backend/ward.py), [`frontend/ward/`](frontend/ward).
+
+> [!NOTE]
+> The stick figure is a scripted visualisation of the room, not a reconstruction from the Wi-Fi signal.
 
 ---
 
@@ -442,6 +482,9 @@ python -m ml.room_motion train <room dataset>  # research movement model
 | `GET` | `/events/{id}/investigations` | evidence reports |
 | `POST` | `/checkins`, `/investigate` | policy-checked manual check-in, re-run investigation |
 | `POST` | `/webhooks/photon` | signed inbound iMessage events |
+| `GET` | `/ward/state` | room stress (source: board or remote), alert state, text thread |
+| `GET` | `/ward/control` | phone remote for the stress monitor |
+| `POST` | `/ward/stress`, `/ward/view`, `/ward/close` | set stress from the remote, open / close the room from the screen |
 
 Interactive docs at `http://127.0.0.1:8000/docs`.
 
@@ -457,7 +500,10 @@ photon/          Photon 2.0 client, webhook verification, check-in state machine
 models/          room movement model, calibration, conformal threshold
 evaluation/      saved metrics behind every number above
 sim/             WiFall replay sensor
-tests/           37 tests
+tests/           44 tests (pytest.ini runs only these; WiCare's own tests live in wicare/fallguard/tests)
+wicare/          the team's WiCare repo (FallGuard board client, fusion, dashboard), merged with its history
+frontend/ward/   private room page: closed 3D room, stress monitor, opens on the nurse's reply 1
+backend/ward.py  room stress monitor (WiCare board or remote), nurse 1/2 question, room state
 ```
 
 ## 11. Limitations and roadmap
@@ -473,11 +519,13 @@ tests/           37 tests
 - per-person routines instead of fixed thresholds
 - a learned fall model on the recorded sessions, starting from the raw-CSI research path
 - a nurse dashboard across multiple rooms and patients
+- drive the stick figure from the boards instead of a script
 
 ## 12. Credits
 
 - ESPectre: ESP32 Wi-Fi motion sensing firmware running on the boards
 - [WiCare](https://github.com/duna-akin/WiCare): the team's board client, fusion and burst-then-stillness rule
+  (merged into `wicare/`), and the board score behind the room's stress monitor
 - [WiFall](https://github.com/RS2002/WiFall): public CSI activity dataset used for the benchmark
 - [RuView](https://github.com/ruvnet/RuView): CSI firmware for the research recordings, and the 3D room view
 - [Photon](https://photon.codes): iMessage messaging API

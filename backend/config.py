@@ -20,6 +20,8 @@ class Settings:
         self.patient_address = os.getenv('PATIENT_ADDRESS', '')      # E.164 for iMessage
         self.caregiver_address = os.getenv('CAREGIVER_ADDRESS', '')
         self.checkin_timeout_s = float(os.getenv('CHECKIN_TIMEOUT_S', '90'))
+        # 0 = room demo: the nurse only gets the room's "check on them? 1/2" text (backend/ward.py), no patient check-in
+        self.patient_checkins = _b('PATIENT_CHECKINS', '1')
         # photon
         self.photon_mode = os.getenv('PHOTON_MODE', 'mock')          # mock | api
         self.photon_api_base = os.getenv('PHOTON_API_BASE', 'https://api.photon.codes')

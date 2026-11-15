@@ -329,7 +329,7 @@ for (let r = 1; r <= ROOMS; r++) {
   el.className = 'mon'; el.id = `mon-${r}`;
   el.innerHTML = `<div class="mon-top"><span class="mon-room">Room ${r}</span><span>STRESS</span></div>
     <div class="mon-val">--</div><canvas width="300" height="70"></canvas>
-    <div class="mon-foot"><span class="lvl">--</span>${r === LIVE ? '<span class="tag">LIVE CONTROL</span>' : '<span>simulated</span>'}</div>`;
+    <div class="mon-foot"><span class="lvl">--</span>${r === LIVE ? '<span class="tag">REMOTE</span>' : '<span>simulated</span>'}</div>`;
   mons.appendChild(el);
 }
 
@@ -385,7 +385,8 @@ function render() {
   }
   for (let r = 1; r <= ROOMS; r++) {
     const tag = $(`mon-${r}`).querySelector('.mon-foot span:last-child');
-    tag.className = r === LIVE ? 'tag' : ''; tag.textContent = r === LIVE ? 'LIVE CONTROL' : 'simulated';
+    const src = state.rooms[r - 1].source;
+    tag.className = r === LIVE ? 'tag' : ''; tag.textContent = r !== LIVE ? 'simulated' : src === 'board' ? 'WICARE BOARD' : 'REMOTE';
     paintShell(r, state.rooms[r - 1].level, state.alert && state.alert.room === r ? state.alert.state : '');
   }
   $('open-now').textContent = `Open room ${LIVE}`;

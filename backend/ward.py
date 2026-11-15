@@ -5,6 +5,13 @@ from the control page (GET /ward/control on a phone). When it stays high, AuraCa
 "Do you want to check?" Reply 1 / YES -> the ward screen opens that room (3D, the only time anyone sees inside a
 room). 2 / NO -> dismissed. Privacy: the ward overview shows closed rooms only.
 
+Where the live room's stress comes from (WiCare hook):
+  - 'board': the team's WiCare / ESPectre boards. Every board score that reaches /ingest/observation from
+    `python -m monitoring.espectre_worker` is also fed here; stress = score / BURST_THRESHOLD * 70, so the board's own
+    "strong movement" line (0.962) sits exactly on the alert line (70). Used while boards send data (< 3 s old).
+  - 'remote': the control page. Moving it overrides the board for WARD_REMOTE_HOLD_S (30 s), and it is the source
+    whenever no board is connected.
+
 alert state: calm -> asked -> viewing | dismissed. A new alert needs the room to drop below LOW first (re-arm).
 """
 import math, os, random, threading
@@ -13,6 +20,9 @@ from backend.db import new_id, now, iso
 ROOMS = int(os.getenv('WARD_ROOMS', '1'))              # demo: one private room (set 5 for the ward view)
 LIVE_ROOM = min(ROOMS, int(os.getenv('WARD_LIVE_ROOM', '1')))
 HIGH, LOW, HOLD_S = 70.0, 50.0, 3.0      # alert when >= HIGH for HOLD_S; re-arm below LOW
+BOARD_HOLD_S = 1.0                       # board bursts are short (WiCare: <= 3 s), so react after 1 s
+BOARD_FRESH_S = 3.0                      # board data older than this = no board
+REMOTE_HOLD_S = float(os.getenv('WARD_REMOTE_HOLD_S', '30'))
 SERIES_N = 90                            # 1 Hz samples kept per room
 
 ASK = ("\U0001FA7A AuraCare | Ward Alert\n\n"
@@ -24,8 +34,10 @@ DISMISSED = "\U0001FA7A AuraCare\n\nOkay, we'll keep watching Room {room}."
 
 
 class Ward:
-    def __init__(self, photon, db):
+    def __init__(self, photon, db, board_threshold=0.962):
         self.photon, self.db = photon, db
+        self.board_threshold = board_threshold
+        self._board_peak, self._board_ts, self._remote_at = None, None, None
         self.lock = threading.RLock()
         self._seed = [random.random() * 100 for _ in range(5)]
         self.target = 30.0                      # live room, set by the control page
@@ -48,16 +60,39 @@ class Ward:
             return round(max(0, min(100, self.value + 1.5 * math.sin(t * 1.7))), 1)
         return self._calm(room, t)
 
-    def set_target(self, value):
+    def set_target(self, value, t=None):
+        """Remote (control page). Overrides the board for REMOTE_HOLD_S."""
         with self.lock:
             self.target = max(0.0, min(100.0, float(value)))
+            self._remote_at = now() if t is None else t
         return self.target
+
+    def board_sample(self, score, ts=None):
+        """One WiCare board score (fused across boards by the worker). Keeps the peak between ticks so a short
+        burst is never missed."""
+        with self.lock:
+            self._board_peak = score if self._board_peak is None else max(self._board_peak, score)
+            self._board_ts = now() if ts is None else ts
+
+    def source(self, t=None):
+        t = now() if t is None else t
+        if self._remote_at is not None and t - self._remote_at < REMOTE_HOLD_S:
+            return 'remote'
+        if self._board_ts is not None and t - self._board_ts < BOARD_FRESH_S:
+            return 'board'
+        return 'remote'
 
     # ---- 1 Hz tick: smooth the live room, record series, run the alert rule
     def tick(self, t=None):
         t = now() if t is None else t
         with self.lock:
-            self.value += (self.target - self.value) * 0.5
+            src = self.source(t)
+            if src == 'board':
+                if self._board_peak is not None:
+                    self.value = max(0.0, min(100.0, self._board_peak / self.board_threshold * HIGH))
+                    self._board_peak = None
+            else:
+                self.value += (self.target - self.value) * 0.5
             for r in range(1, ROOMS + 1):
                 s = self.series[r]
                 s.append((t, self.current(r, t)))
@@ -69,7 +104,7 @@ class Ward:
                     self.alert = None
             elif v >= HIGH and self.armed and not self.alert:
                 self._high_since = self._high_since or t
-                if t - self._high_since >= HOLD_S:
+                if t - self._high_since >= (BOARD_HOLD_S if src == 'board' else HOLD_S):
                     self._open(LIVE_ROOM, v, t)
 
     def _open(self, room, value, t):
@@ -120,7 +155,7 @@ class Ward:
             t = now()
             rooms = [dict(room=r, value=self.current(r, t),
                           series=[round(v, 1) for _, v in self.series[r]],
-                          source='control' if r == LIVE_ROOM else 'simulated',
+                          source=self.source(t) if r == LIVE_ROOM else 'simulated',
                           level='high' if self.current(r, t) >= HIGH else 'elevated' if self.current(r, t) >= LOW else 'calm')
                      for r in range(1, ROOMS + 1)]
             a = dict(self.alert) if self.alert else None
@@ -147,7 +182,7 @@ input{width:100%;height:44px;accent-color:var(--acc)}
 .row{display:flex;gap:10px;margin-top:14px}button{flex:1;padding:16px;border:0;border-radius:12px;font-size:16px;
 font-weight:600;color:#fff;background:var(--acc)}button.hi{background:var(--hi)}small{color:var(--mut)}
 </style></head><body><div class="card">
-<h1 id="h">Room stress monitor</h1><p>Drag or tap. 70+ for 3 s texts the nurse.</p>
+<h1 id="h">Room stress monitor</h1><p>Drag or tap. 70+ for 3 s texts the nurse. While the WiCare board is connected it drives the monitor; moving this takes over for 30 s.</p>
 <div class="v" id="v">--</div><input id="s" type="range" min="0" max="100" value="30">
 <div class="row"><button id="calm">Calm (30)</button><button class="hi" id="high">Stressed (85)</button></div>
 <p style="margin-top:14px"><small id="st">connecting...</small></p></div>
@@ -158,6 +193,6 @@ body:JSON.stringify({value:+x})})}catch(e){st.textContent='not connected'}}
 s.oninput=()=>set(s.value);document.getElementById('calm').onclick=()=>set(30);document.getElementById('high').onclick=()=>set(85);
 let first=true;async function poll(){try{const r=await (await fetch('/ward/state')).json();const room=r.rooms[r.live_room-1];if(first){s.value=r.target;first=false;document.getElementById('h').textContent='Room '+r.live_room+' stress monitor'}
 v.textContent=Math.round(room.value);v.className='v'+(room.value>=r.high?' hi':'');
-st.textContent=r.alert?('Nurse: '+r.alert.state):'Watching, no alert';}catch(e){st.textContent='not connected'}
+st.textContent=(room.source==='board'?'Source: WiCare board · ':'Source: this remote · ')+(r.alert?('nurse: '+r.alert.state):'no alert');}catch(e){st.textContent='not connected'}
 setTimeout(poll,700)}poll();
 </script></body></html>"""
