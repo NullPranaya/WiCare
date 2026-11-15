@@ -23,5 +23,5 @@ $PY -m ml.train_cnn
 $PY -m ml.evaluate
 $PY -m pytest -q
 
-[ -d .git ] || { git init -q && git add . && git commit -qm "AuraCare initial" && echo ">> git repo created"; }
+[ -d .git ] || { git init -q && git add . && git commit -qm "WiCare initial" && echo ">> git repo created"; }
 echo ">> ALL DONE. Next time just run: source .venv/bin/activate"

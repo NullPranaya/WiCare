@@ -314,14 +314,31 @@ def test_failed_send_does_not_wait_for_reply(tmp_path):
     assert replies.armed == 0 and app.state.engine.awaiting_reply is False
 
 
-def test_room_page_served(tmp_path):
+def test_room_page_served(tmp_path, monkeypatch):
+    """WiCare on its own: /room is the placeholder page."""
+    from fallguard import room
+    monkeypatch.setattr(room, "ROOM_3D_DIR", tmp_path / "no-frontend")
     with TestClient(build(tmp_path, [])) as client:
         response = client.get("/room")
     assert response.status_code == 200 and "Room view" in response.text
 
 
+def test_room_opens_auracare_3d_view_when_present(tmp_path):
+    """Inside the AuraCare repo: /room goes to the 3D room view served at /room3d/."""
+    from fallguard import room
+    if not room.has_room_3d():
+        pytest.skip("AuraCare frontend not present")
+    with TestClient(build(tmp_path, [])) as client:
+        redirect = client.get("/room", follow_redirects=False)
+        page = client.get(redirect.headers["location"])
+    assert redirect.headers["location"] == "/room3d/?room=1"
+    assert page.status_code == 200 and "aura" in page.text
+
+
 @pytest.mark.parametrize("path", ["/", "/static/app.js", "/static/style.css", "/room"])
-def test_pages_and_assets_are_revalidated(tmp_path, path):
+def test_pages_and_assets_are_revalidated(tmp_path, path, monkeypatch):
+    from fallguard import room
+    monkeypatch.setattr(room, "ROOM_3D_DIR", tmp_path / "no-frontend")
     with TestClient(build(tmp_path, [])) as client:
         response = client.get(path)
     assert response.status_code == 200 and response.headers["cache-control"] == "no-cache"

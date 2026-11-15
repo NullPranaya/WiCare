@@ -13,11 +13,12 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { DemoDataGenerator } from './demo-data.js';
+import { PixelPatient } from './pixel-patient.js';
 import { NebulaBackground } from './nebula-background.js';
 import { PostProcessing } from './post-processing.js';
 import { FigurePool, SKELETON_PAIRS } from './figure-pool.js';
 import { PoseSystem } from './pose-system.js';
-import { AuraCare } from './auracare.js';
+import { WiCare } from './auracare.js';
 import { ScenarioProps } from './scenario-props.js';
 import { HudController, DEFAULTS, SETTINGS_VERSION, PRESETS, SCENARIO_NAMES } from './hud-controller.js';
 
@@ -30,7 +31,7 @@ const C = {
   blueSignal: 0x2090ff,
   redAlert:   0xff3040,
   redHeart:   0xff4060,
-  bgDeep:     0x101a2c,   // AuraCare: lifted from 0x080c14
+  bgDeep:     0x101a2c,   // WiCare: lifted from 0x080c14
 };
 
 // SCENARIO_NAMES, DEFAULTS, SETTINGS_VERSION, PRESETS imported from hud-controller.js
@@ -53,6 +54,10 @@ class Observatory {
         localStorage.setItem('ruview-settings-version', SETTINGS_VERSION);
       }
     } catch {}
+    // WiCare room view (?room=1): a solid, easy-to-read figure (no haze, no trail, darker colours for a white floor)
+    this._roomView = new URLSearchParams(location.search).has('room');
+    if (this._roomView) Object.assign(this.settings, { wireColor: '#0c9a6a', jointColor: '#0b5e45', boneThick: 0.055, jointSize: 0.04,
+      glow: 0.12, trail: 0, aura: 0, bloom: 0.05, reflect: 0, exposure: 1.15, scenario: 'auto' });
 
     // Renderer
     this._renderer = new THREE.WebGLRenderer({
@@ -87,6 +92,10 @@ class Observatory {
     this._controls.maxDistance = 25;
     this._controls.maxPolarAngle = Math.PI * 0.88;
     this._controls.target.set(0, 1.2, 0);
+    if (new URLSearchParams(location.search).has('room')) {     // WiCare room view: closer on the hospital bed
+      this._camera.position.set(1.7, 2.7, 2.6);
+      this._controls.target.set(-1.2, 0.55, -1.7);
+    }
     this._controls.update();
 
     this._clock = new THREE.Clock();
@@ -106,12 +115,17 @@ class Observatory {
     this._buildRoom();
     this._buildRouter();
     this._poseSystem = new PoseSystem();
+    FigurePool.solid = !!this._roomView;
     this._figurePool = new FigurePool(this._scene, this.settings, this._poseSystem);
     this._scenarioProps = new ScenarioProps(this._scene);
     this._buildDotMatrixMist();
     this._buildParticleTrail();
     this._buildWifiWaves();
     this._buildSignalField();
+    if (new URLSearchParams(location.search).has('room')) {
+      this._basicRoomView();
+      this._pixel = new PixelPatient(this._scene);     // the patient, drawn as a pixel-style man in a gown
+    }
 
     // Post-processing
     this._postProcessing = new PostProcessing(this._renderer, this._scene, this._camera);
@@ -205,7 +219,7 @@ class Observatory {
     // Reflective floor
     const floorGeo = new THREE.PlaneGeometry(12, 10);
     this._floorMat = new THREE.MeshStandardMaterial({
-      color: 0x1c2e26,                                   // AuraCare: lifted from 0x101810
+      color: 0x1c2e26,                                   // WiCare: lifted from 0x101810
       roughness: 1.0 - this.settings.reflect * 0.7,
       metalness: this.settings.reflect * 0.5,
       emissive: 0x0a1a14,
@@ -223,6 +237,20 @@ class Observatory {
     table.position.set(-4, 0.3, -3);
     table.castShadow = true;
     this._scene.add(table);
+    this._table = table;
+  }
+
+  // WiCare room view (?room=1): plain floor and grid, nothing else in the room but the bed and the person
+  _basicRoomView() {
+    for (const o of [this._routerGroup, this._table, this._fieldPoints, this._roomWire]) if (o) o.visible = false;
+    for (const o of [this._mistPoints, this._trail]) if (o) o.visible = false;   // haze and trail hide the figure
+    // white hospital floor with light tile joints
+    if (this._floorMat) { this._floorMat.color.set(0xf2f5f6); this._floorMat.emissive.set(0x9aa3a8);
+      this._floorMat.emissiveIntensity = 0.35; this._floorMat.roughness = 0.55; this._floorMat.metalness = 0; }
+    this._scene.remove(this._grid);
+    this._grid = new THREE.GridHelper(12, 20, 0xd5dce0, 0xd5dce0);
+    this._grid.position.y = 0.003;
+    this._scene.add(this._grid);
   }
 
   // ---- Router ----
@@ -275,6 +303,7 @@ class Observatory {
       shell.position.y += 0.5;
       this._scene.add(shell);
       this._wifiWaves.push({ mesh: shell, mat, phase: i * 0.7 });
+      if (new URLSearchParams(location.search).has('room')) shell.visible = false;   // WiCare room view: no wave domes
     }
   }
 
@@ -304,7 +333,7 @@ class Observatory {
         void main() {
           vAlpha = alpha;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = 2.0 * (200.0 / -mv.z);   // AuraCare: finer dots (was 3.0)
+          gl_PointSize = 2.0 * (200.0 / -mv.z);   // WiCare: finer dots (was 3.0)
           gl_Position = projectionMatrix * mv;
         }
       `,
@@ -526,6 +555,10 @@ class Observatory {
     // Updates
     this._nebula.update(dt, elapsed);
     this._figurePool.update(data, elapsed);
+    if (this._pixel) {
+      for (const f of this._figurePool.figures) f.group.visible = false;
+      this._pixel.update(data, elapsed);
+    }
     this._scenarioProps.update(data, this._demoData.currentScenario);
     this._updateDotMatrixMist(data, elapsed);
     this._updateParticleTrail(data, dt, elapsed);
@@ -533,7 +566,7 @@ class Observatory {
     this._updateSignalField(data);
     this._hud.updateHUD(data, this._demoData);
     this._hud.updateSparkline(data);
-    if (!this._aura) this._aura = new AuraCare(this);
+    if (!this._aura) this._aura = new WiCare(this);
     this._aura.update(data, dt, this.settings.dataSource);
 
     // Router LED
@@ -582,7 +615,7 @@ class Observatory {
     const px = pp[0] || 0, pz = pp[2] || 0;
     const ms = persons[0].motion_score || 0;
     const pose = persons[0].pose || 'standing';
-    const isLying = pose === 'lying' || pose === 'fallen' || (pose === 'waking' && (persons[0].wake || 0) < 1.5);
+    const isLying = pose === 'lying' || pose === 'fallen' || pose === 'bedfall' || (pose === 'waking' && (persons[0].wake || 0) < 1.5);
     const bodyH = isLying ? 0.4 : 1.7;
     const bodyBaseY = isLying ? (pp[1] || 0) + 0.05 : 0.05;
     const spread = ms > 50 ? 0.6 : 0.4;
@@ -595,7 +628,7 @@ class Observatory {
 
       let bodyWidth;
       if (isLying) {
-        bodyWidth = 0.7;                                 // AuraCare: spread along the floor (was 0.25)
+        bodyWidth = 0.7;                                 // WiCare: spread along the floor (was 0.25)
       } else {
         bodyWidth = layerT > 0.75 ? 0.15 : (layerT > 0.45 ? 0.25 : 0.18);
       }
@@ -604,12 +637,12 @@ class Observatory {
       const tx = px + Math.cos(angle + i * 0.3) * r + drift;
       const tz = pz + Math.sin(angle + i * 0.5) * r * 0.6;
 
-      const k = isLying ? 0.2 : 0.05;                    // AuraCare: drop with the body, don't linger upright
+      const k = isLying ? 0.2 : 0.05;                    // WiCare: drop with the body, don't linger upright
       pos.array[i * 3] += (tx - pos.array[i * 3]) * k;
       pos.array[i * 3 + 1] += (layerY - pos.array[i * 3 + 1]) * k;
       pos.array[i * 3 + 2] += (tz - pos.array[i * 3 + 2]) * k;
 
-      const targetAlpha = 0.05 + Math.sin(elapsed * 2 + i * 0.5) * 0.03;   // AuraCare: softer (was 0.15 / 0.08)
+      const targetAlpha = 0.05 + Math.sin(elapsed * 2 + i * 0.5) * 0.03;   // WiCare: softer (was 0.15 / 0.08)
       alpha.array[i] += (targetAlpha - alpha.array[i]) * 0.08;
     }
     pos.needsUpdate = true;

@@ -1,4 +1,4 @@
-"""Live loop for ESPectre boards (the team's WiCare setup): board motion score SSE -> fused level -> AuraCare.
+"""Live loop for ESPectre boards (the team's WiCare setup): board motion score SSE -> fused level -> WiCare.
   python -m monitoring.espectre_worker                                    # boards from ESPECTRE_BOARDS in .env
   python -m monitoring.espectre_worker --boards b1=http://172.20.10.3:62587/espectre/v1,b2=http://172.20.10.4:62587/espectre/v1
   python -m monitoring.espectre_worker --replay data/sessions/20261114-190000.jsonl   # a recorded session (ours or WiCare's)

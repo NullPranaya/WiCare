@@ -1,8 +1,8 @@
 /**
- * AuraCare instruments, drawn as dot matrices to match the scene's floor.
+ * WiCare instruments, drawn as dot matrices to match the scene's floor.
  *  - BreathRing: a ring of dots that expands and contracts at the breathing rate (demo / RuView data only)
  *  - RoomTrail:  top-down dot map; the person leaves a fading trail (demo / RuView data only)
- *  - dotChart:   last-60-s movement as columns of dots (AuraCare backend data)
+ *  - dotChart:   last-60-s movement as columns of dots (WiCare backend data)
  * Nothing here invents numbers: each takes the value it is given and shows "--"/dim when there is none.
  */
 const GREEN = [0, 216, 120], AMBER = [255, 176, 32], ORANGE = [255, 138, 61], BLUE = [32, 144, 255];

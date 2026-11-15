@@ -19,7 +19,7 @@ export const SCENARIO_NAMES = [
 ];
 
 export const DEFAULTS = {
-  // AuraCare: brighter room (was bloom 0.08, exposure 1.3, vignette 0.25, glow 0.3, field 0.45, waves 0.4, ambient 0.7)
+  // WiCare: brighter room (was bloom 0.08, exposure 1.3, vignette 0.25, glow 0.3, field 0.45, waves 0.4, ambient 0.7)
   bloom: 0.22, bloomRadius: 0.2, bloomThresh: 0.6,
   exposure: 1.75, vignette: 0.12, grain: 0.01, chromatic: 0.0005,
   boneThick: 0.026, jointSize: 0.045, glow: 0.5, trail: 0.35,

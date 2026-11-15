@@ -10,6 +10,7 @@ uvicorn
 httpx
 requests
 websocket-client   # monitoring/csi_worker.py (hub /v1/csi stream)
+websockets         # WiCare dashboard live updates (uvicorn WebSocket support)
 python-dotenv
 pydantic==2.14.3
 pytest

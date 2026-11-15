@@ -17,6 +17,7 @@ const SCENARIO_PROPS = {
   fall_event:       [],
   sleep_monitoring: ['bed'],
   wake_up:          ['bed'],
+  stand_fall:       ['hospital'],   // WiCare room view (?room=1): dotted hospital bed
   intrusion_detect: ['door'],
   gesture_control:  ['screen'],
   crowd_occupancy:  ['desk', 'desk2'],
@@ -78,6 +79,7 @@ export class ScenarioProps {
     const accentMat = new THREE.MeshStandardMaterial({ color: 0x606070, roughness: 0.4, metalness: 0.4, emissive: 0x101018, emissiveIntensity: 0.15 });
 
     this._buildBed(darkMat);
+    this._buildHospital();
     this._buildChair(darkMat, accentMat);
     this._buildExerciseMat();
     this._buildDoor();
@@ -86,6 +88,63 @@ export class ScenarioProps {
     this._buildDesks(darkMat, metalMat, accentMat);
     this._buildCameras(metalMat);
     this._buildAlertSystem();
+  }
+
+  // ---- HOSPITAL BED + A HINT OF THE ROOM (WiCare room view, ?room=1) ----
+  // A real bed; the room is only suggested (a corner of two walls that fade out, a cabinet, an IV pole), never mapped.
+  // Bed centre (-1.5, -2.5), head toward -x, mattress top 0.53 (matches pose-system's wake-up keypoints).
+  _buildHospital() {
+    const g = new THREE.Group();
+    const BX = 3.5 + WAKE_BED.dx, BZ = -3.5 + WAKE_BED.dz;
+    const m = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.05, ...o });
+    const frame = m(0xeef2f4), steel = m(0xb9c3c9, { metalness: 0.6, roughness: 0.3 }), dark = m(0x3a4246);
+    const sheet = m(0xffffff, { roughness: 0.9 }), blanket = m(0x8fbfdd, { roughness: 0.95 }), board = m(0xd7e3e8);
+    const add = (mesh) => (g.add(mesh), mesh);
+    // bed
+    add(this._box(BX, 0.34, BZ, 2.1, 0.1, 0.98, frame));
+    add(this._box(BX, 0.2, BZ, 1.5, 0.06, 0.5, steel));
+    for (const [dx, dz] of [[-0.92, -0.4], [0.92, -0.4], [-0.92, 0.4], [0.92, 0.4]]) {
+      add(this._cyl(BX + dx, 0.19, BZ + dz, 0.025, 0.025, 0.26, 10, steel));
+      const w = add(this._cyl(BX + dx, 0.055, BZ + dz, 0.055, 0.055, 0.045, 16, dark)); w.rotation.x = Math.PI / 2;
+    }
+    add(this._box(BX, 0.455, BZ, 2.0, 0.15, 0.92, sheet));
+    add(this._box(BX + 0.42, 0.54, BZ, 1.16, 0.04, 0.96, blanket));
+    add(this._box(BX + 1.0, 0.5, BZ, 0.04, 0.1, 0.96, blanket));                      // blanket fold over the foot
+    add(this._box(BX - 0.8, 0.575, BZ, 0.34, 0.09, 0.62, sheet));
+    add(this._box(BX - 1.08, 0.68, BZ, 0.07, 0.66, 1.0, board));                      // headboard
+    add(this._box(BX + 1.08, 0.57, BZ, 0.07, 0.44, 1.0, board));                      // footboard
+    add(this._box(BX + 1.13, 0.66, BZ + 0.25, 0.02, 0.12, 0.24, dark));               // foot controls
+    add(this._box(BX - 0.35, 0.72, BZ - 0.5, 0.95, 0.03, 0.03, steel));               // far-side rail
+    add(this._box(BX - 0.35, 0.62, BZ - 0.5, 0.95, 0.03, 0.03, steel));
+    for (const dx of [-0.8, 0.1]) add(this._box(BX + dx, 0.58, BZ - 0.5, 0.03, 0.28, 0.03, steel));
+    // IV pole at the head, far side; bedside cabinet at the foot, far side
+    const ix = BX - 1.3, iz = BZ - 0.75;
+    add(this._cyl(ix, 0.95, iz, 0.016, 0.016, 1.9, 8, steel));
+    for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; const leg = add(this._box(ix + Math.cos(a) * 0.14, 0.025, iz + Math.sin(a) * 0.14, 0.28, 0.02, 0.03, steel)); leg.rotation.y = -a; }
+    add(this._box(ix, 1.88, iz, 0.36, 0.015, 0.015, steel));
+    add(this._box(ix + 0.12, 1.7, iz, 0.13, 0.22, 0.05, m(0xe2f3fb, { transparent: true, opacity: 0.75, roughness: 0.2 })));
+    add(this._box(BX + 1.45, 0.32, BZ - 0.6, 0.45, 0.64, 0.45, m(0xe9e4dc)));
+    add(this._box(BX + 1.45, 0.645, BZ - 0.6, 0.47, 0.02, 0.47, m(0xcdb79a)));
+    // a hint of the room: two wall pieces meeting behind the head of the bed, fading out
+    const fadeTex = (horizontal) => {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 16;
+      const x = c.getContext('2d'), gr = x.createLinearGradient(0, 0, 256, 0);
+      gr.addColorStop(0, '#fff'); gr.addColorStop(0.55, '#bbb'); gr.addColorStop(1, '#000');
+      x.fillStyle = gr; x.fillRect(0, 0, 256, 16);
+      const t = new THREE.CanvasTexture(c); return t;
+    };
+    const wallMat = () => new THREE.MeshStandardMaterial({ color: 0xd8d6d2, roughness: 0.95, transparent: true, alphaMap: fadeTex(), side: THREE.DoubleSide, depthWrite: false });
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 2.3), wallMat());
+    back.position.set(BX - 1.95 + 2.1, 1.15, BZ - 0.95); g.add(back);
+    const left = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 2.3), wallMat());
+    left.rotation.y = -Math.PI / 2; left.position.set(BX - 1.95, 1.15, BZ - 0.95 + 1.6); g.add(left);
+    // skirting strip along both walls, fading the same way
+    const skirt = (w, x, z, ry) => { const s = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.12), new THREE.MeshStandardMaterial({ color: 0xb8c6cc, transparent: true, alphaMap: fadeTex(), depthWrite: false, side: THREE.DoubleSide }));
+      s.position.set(x, 0.06, z); s.rotation.y = ry; g.add(s); };
+    skirt(4.2, BX - 1.95 + 2.1, BZ - 0.94, 0); skirt(3.2, BX - 1.94, BZ - 0.95 + 1.6, -Math.PI / 2);
+    this._props.hospital = g;
+    g.visible = false;
+    this._scene.add(g);
   }
 
   // ---- BED (sleep monitoring) ----
@@ -660,7 +719,7 @@ export class ScenarioProps {
       for (const name of propsToShow) {
         if (this._props[name]) this._props[name].visible = true;
       }
-      // AuraCare wake-up scene uses the same bed, moved into view
+      // WiCare wake-up scene uses the same bed, moved into view
       if (this._props.bed) {
         const w = scenario === 'wake_up';
         this._props.bed.position.set(w ? WAKE_BED.dx : 0, 0, w ? WAKE_BED.dz : 0);

@@ -1,6 +1,6 @@
 <div align="center">
 
-# AuraCare
+# WiCare
 
 ### Using Wi-Fi waves to watch over patients and alert their nurses.
 
@@ -25,12 +25,12 @@ Every Wi-Fi router fills a room with radio waves. Those waves bounce off walls, 
 reach a receiver. When a person moves, the bounces change, and the change is measurable down to the individual
 frequencies inside the signal.
 
-**AuraCare reads those changes.** ESP32 boards running ESPectre firmware listen to the room's Wi-Fi and turn the
-signal into a motion score four times a second. AuraCare fuses the boards and watches for one specific shape in
+**WiCare reads those changes.** ESP32 boards running ESPectre firmware listen to the room's Wi-Fi and turn the
+signal into a motion score four times a second. WiCare fuses the boards and watches for one specific shape in
 time: **a short burst of strong movement (at most 3 s), followed by 8 s of stillness.** Walking past, rolling
-over or getting up don't match it. When it sees a match, AuraCare doesn't sound an alarm. It asks:
+over or getting up don't match it. When it sees a match, WiCare doesn't sound an alarm. It asks:
 
-> 💙 **AuraCare | Wellbeing Check**
+> 💙 **WiCare | Wellbeing Check**
 >
 > Hi! We noticed some unusual movement in your room and wanted to check on you.
 >
@@ -41,7 +41,7 @@ over or getting up don't match it. When it sees a match, AuraCare doesn't sound 
 
 At the same moment, the patient's nurse gets a calm heads-up, so the care team is never out of the loop:
 
-> 🩺 **AuraCare | Care Team Notice**
+> 🩺 **WiCare | Care Team Notice**
 >
 > We noticed unusual movement in your patient's room and just sent them a wellbeing check.
 > No action needed yet. We'll update you as soon as they reply.
@@ -52,7 +52,7 @@ gets a warm thank-you either way. The nurse can text back *"why did this alert?"
 from recorded sensor data, with the IDs of the measurements it used.
 
 > [!NOTE]
-> AuraCare is a research prototype, tested only with consenting teammates and fictional patients. It is not a
+> WiCare is a research prototype, tested only with consenting teammates and fictional patients. It is not a
 > medical device and makes no fall-detection, clinical or diagnostic claims. It asks. It never diagnoses.
 
 ---
@@ -70,7 +70,7 @@ Only a stress monitor shows outside the door.
    A teammate can also drive it from a **remote** on their phone (`/ward/control`); moving the remote takes over from
    the board for 30 s, and it is the source whenever no board is connected.
 2. **Alert.** Stress at 70+ (1 s from the board, 3 s from the remote): the room pops up red and the nurse's phone gets
-   > 🩺 **AuraCare | Ward Alert**
+   > 🩺 **WiCare | Ward Alert**
    >
    > Room 1's stress level is high (85). Do you want to check on them?
    >
@@ -144,7 +144,7 @@ flowchart LR
         TX[iPhone hotspot<br/>router] -. multipath .-> B1[ESP32 board b1<br/>ESPectre]
         TX -. multipath .-> B2[ESP32 board b2<br/>ESPectre]
     end
-    subgraph CORE["AuraCare core"]
+    subgraph CORE["WiCare core"]
         B1 -- SSE motion score 4/s --> W[espectre_worker<br/>one stream per board]
         B2 -- SSE motion score 4/s --> W
         W --> F[fusion<br/>every board must see the burst]
@@ -169,7 +169,7 @@ flowchart LR
 sequenceDiagram
     autonumber
     participant R as Room
-    participant A as AuraCare
+    participant A as WiCare
     participant P as Patient
     participant C as Nurse
     R->>A: motion score, 4 / s per board
@@ -304,7 +304,7 @@ People counting at 0.64 is too weak to act on, so it is never allowed to cancel 
 
 #### Decoding the radio
 Almost every packet arrives as 256 signed bytes (802.11n): an L-LTF block and an HT-LTF block, each holding 64 subcarriers as
-`[imag, real]` pairs. AuraCare takes the L-LTF block (`raw[0:128]`) and rebuilds the complex channel:
+`[imag, real]` pairs. WiCare takes the L-LTF block (`raw[0:128]`) and rebuilds the complex channel:
 
 $$H_k = \text{real}_k + j \cdot \text{imag}_k, \qquad k \in \{0..31,\ -32..-1\}$$
 
@@ -323,7 +323,7 @@ Spec sheets said 45 to 50 packets per second. We measured the room instead:
 | Longest gap | **0.8 s** |
 | Packets with subcarriers 0 and +1 zeroed by the chip | **100%** |
 
-So nothing in AuraCare assumes a fixed rate. Every window is cut from laptop receive timestamps, checked with
+So nothing in WiCare assumes a fixed rate. Every window is cut from laptop receive timestamps, checked with
 sequence numbers, and interpolated onto a 50 Hz grid:
 
 - **length:** 2.96 s (148 samples)
@@ -333,7 +333,7 @@ sequence numbers, and interpolated onto a 50 Hz grid:
 The zeroed subcarrier +1 is filled from its neighbour instead of feeding the model a fake zero.
 
 #### Turning waves into motion
-For each node and each window, AuraCare computes 23 motion features from the amplitude matrix
+For each node and each window, WiCare computes 23 motion features from the amplitude matrix
 $X \in \mathbb{R}^{148 \times 52}$:
 
 | Family | What it captures |

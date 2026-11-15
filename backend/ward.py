@@ -1,7 +1,7 @@
 """Ward demo: 5 rooms, each with a stress monitor (0-100 demo index, not a clinical measure).
 
 The other rooms drift at calm levels (simulated). The live room (WARD_LIVE_ROOM, default 1) is set by a teammate
-from the control page (GET /ward/control on a phone). When it stays high, AuraCare asks the nurse over iMessage:
+from the control page (GET /ward/control on a phone). When it stays high, WiCare asks the nurse over iMessage:
 "Do you want to check?" Reply 1 / YES -> the ward screen opens that room (3D, the only time anyone sees inside a
 room). 2 / NO -> dismissed. Privacy: the ward overview shows closed rooms only.
 
@@ -25,12 +25,12 @@ BOARD_FRESH_S = 3.0                      # board data older than this = no board
 REMOTE_HOLD_S = float(os.getenv('WARD_REMOTE_HOLD_S', '30'))
 SERIES_N = 90                            # 1 Hz samples kept per room
 
-ASK = ("\U0001FA7A AuraCare | Ward Alert\n\n"
+ASK = ("\U0001FA7A WiCare | Ward Alert\n\n"
        "Room {room}'s stress level is high ({value}).\n\n"
        "Do you want to check on them?\n\n"
        "Reply 1: YES\nReply 2: NO")
-OPENED = "\U0001F49A AuraCare\n\nOpening Room {room} on the ward screen now."
-DISMISSED = "\U0001FA7A AuraCare\n\nOkay, we'll keep watching Room {room}."
+OPENED = "\U0001F49A WiCare\n\nOpening Room {room} on the ward screen now."
+DISMISSED = "\U0001FA7A WiCare\n\nOkay, we'll keep watching Room {room}."
 
 
 class Ward:

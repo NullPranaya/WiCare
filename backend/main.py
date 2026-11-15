@@ -1,4 +1,4 @@
-"""AuraCare API. Run: uvicorn backend.main:app --host 127.0.0.1 --port 8000"""
+"""WiCare API. Run: uvicorn backend.main:app --host 127.0.0.1 --port 8000"""
 import json, sqlite3, threading
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
@@ -38,7 +38,7 @@ async def lifespan(app):
     yield
     stop.set()
 
-app = FastAPI(title='AuraCare', lifespan=lifespan)
+app = FastAPI(title='WiCare', lifespan=lifespan)
 # the room UI (frontend/, served on :3000) reads /care/state; local origins only, read-only
 app.add_middleware(CORSMiddleware, allow_origin_regex=r'http://(localhost|127\.0\.0\.1)(:\d+)?', allow_methods=['GET', 'POST'], allow_headers=['content-type'])
 
@@ -164,7 +164,7 @@ async def photon_webhook(request: Request):
     # caregiver question -> grounded answer about the latest event with a check-in
     latest = svc.db.one('SELECT id FROM events WHERE checkin_id IS NOT NULL ORDER BY created_ts DESC LIMIT 1')
     if not latest:
-        svc.photon.send('caregiver', 'AuraCare (test): no recent events to report.', f"chat:{msg['message_id']}")
+        svc.photon.send('caregiver', 'WiCare (test): no recent events to report.', f"chat:{msg['message_id']}")
         return dict(answered=False)
     text = investigator.answer(svc, latest['id'], msg['text'])
     svc.photon.send('caregiver', text, f"chat:{msg['message_id']}", event_id=latest['id'])

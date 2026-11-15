@@ -115,7 +115,12 @@ const _vecTarget = new THREE.Vector3();
 
 const _up = new THREE.Vector3(0, 1, 0), _axis = new THREE.Vector3();
 
+const SOLID = { skin: new THREE.Color(0xf1c6a2), gown: new THREE.Color(0x9fdcc4), dark: new THREE.Color(0x000000) };
+const _capUp = new THREE.Vector3(0, 1, 0), _capAxis = new THREE.Vector3();
+
 export class FigurePool {
+  static solid = false;   // WiCare room view: an opaque, easy-to-read patient with a surgical cap
+
   /**
    * @param {THREE.Scene} scene - The Three.js scene to add figures to
    * @param {object} settings - Shared settings object (boneThick, jointSize, glow, etc.)
@@ -250,8 +255,21 @@ export class FigurePool {
       velocities.push(new THREE.Vector3(0, 0, 0));
     }
 
+    // WiCare: surgical cap (blue dome + band) worn by the patient in the room view
+    let cap = null;
+    if (FigurePool.solid) {
+      cap = new THREE.Group();
+      const capMat = new THREE.MeshStandardMaterial({ color: 0x3f86c6, roughness: 0.8 });
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(0.112, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.45), capMat);
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.104, 0.014, 8, 28), capMat);
+      band.rotation.x = Math.PI / 2; band.position.y = 0.016;
+      dome.castShadow = true;
+      cap.add(dome, band); cap.visible = false;
+      group.add(cap);
+    }
+
     return {
-      group, joints, bones, bodySegments, aura, auraMat, personLight,
+      group, joints, bones, bodySegments, aura, auraMat, personLight, cap,
       visible: false,
       prevPositions,
       velocities,
@@ -384,7 +402,19 @@ export class FigurePool {
       if (seg.isHead) {
         const headJoint = fig.joints[seg.a];
         seg.mesh.position.set(headJoint.position.x, headJoint.position.y + 0.05, headJoint.position.z);
-        seg.mat.opacity = 0.34;   // AuraCare: more solid body (was 0.15)
+        seg.mat.opacity = 0.34;   // WiCare: more solid body (was 0.15)
+        if (FigurePool.solid) {
+          seg.mesh.position.copy(headJoint.position);
+          seg.mat.opacity = 1; seg.mat.transparent = false; seg.mat.color.copy(SOLID.skin); seg.mat.emissive.copy(SOLID.dark);
+          // cap sits on top of the head, pointing away from the shoulders
+          if (fig.cap) {
+            const ls = fig.joints[5].position, rs = fig.joints[6].position;
+            _capAxis.set(headJoint.position.x - (ls.x + rs.x) / 2, headJoint.position.y - (ls.y + rs.y) / 2, headJoint.position.z - (ls.z + rs.z) / 2);
+            if (_capAxis.lengthSq() > 1e-4) fig.cap.quaternion.setFromUnitVectors(_capUp, _capAxis.normalize());
+            fig.cap.position.copy(headJoint.position).addScaledVector(_capAxis, 0.012);
+            fig.cap.visible = true;
+          }
+        }
       } else {
         const jA = fig.joints[seg.a];
         const jB = fig.joints[seg.b];
@@ -394,6 +424,7 @@ export class FigurePool {
           seg.mesh.scale.set(1, 1, len);
           seg.mesh.lookAt(jB.position);
           seg.mat.opacity = 0.28;
+          if (FigurePool.solid) { seg.mat.opacity = 0.92; seg.mat.color.copy(SOLID.gown); seg.mat.emissive.copy(SOLID.dark); }
         }
       }
       seg.mat.emissiveIntensity = 0.1 + Math.abs(breathPulse) * 0.4;
@@ -403,13 +434,13 @@ export class FigurePool {
     const hipY = (fig.joints[11].position.y + fig.joints[12].position.y) / 2;
     const cx = (fig.joints[11].position.x + fig.joints[12].position.x) / 2;
     const cz = (fig.joints[11].position.z + fig.joints[12].position.z) / 2;
-    // AuraCare: softer glow (was aura + pulse*0.8, which bloomed to solid cyan)
+    // WiCare: softer glow (was aura + pulse*0.8, which bloomed to solid cyan)
     fig.auraMat.opacity = (this._settings.aura + Math.abs(breathPulse) * 0.8) * 0.4;
 
     // Pose-adaptive aura: compute from actual keypoint spread
     const auraShape = this._computeAuraShape(fig, pose, breathPulse);
 
-    // AuraCare: the glow follows the body's axis (ankles -> head), so it lies down when the figure does
+    // WiCare: the glow follows the body's axis (ankles -> head), so it lies down when the figure does
     const nose = fig.joints[0].position, la = fig.joints[15].position, ra = fig.joints[16].position;
     const fx = (la.x + ra.x) / 2, fy = (la.y + ra.y) / 2, fz = (la.z + ra.z) / 2;
     _axis.set(nose.x - fx, nose.y - fy, nose.z - fz);

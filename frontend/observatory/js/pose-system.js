@@ -10,11 +10,11 @@
  * Every public method is a pure function: parameters in, keypoint array out.
  */
 
-// AuraCare wake-up scene: the bed is moved by this much (RuView's bed sits behind the right panel)
+// WiCare wake-up scene: the bed is moved by this much (RuView's bed sits behind the right panel)
 export const WAKE_BED = { dx: -5, dz: 1 };
 
 export class PoseSystem {
-  static frail = false;   // AuraCare sets true
+  static frail = false;   // WiCare sets true
 
   // ---- Entry point -------------------------------------------------------
 
@@ -23,7 +23,7 @@ export class PoseSystem {
     const pos = person.position || [0, 0, 0];
     const facing = person.facing || 0;
     const px = pos[0], pz = pos[2];
-    // AuraCare: older-adult gait is slower
+    // WiCare: older-adult gait is slower
     const ms = (person.motion_score || 0) * (PoseSystem.frail && pose === 'walking' ? 0.6 : 1);
     const bp = breathPulse;
 
@@ -38,11 +38,12 @@ export class PoseSystem {
       case 'crouching':   kps = this.poseCrouching(px, pz, elapsed, bp); break;
       case 'walking':     kps = this.poseWalking(px, pz, elapsed, ms, bp); break;
       case 'waking':      kps = this.poseWaking(person.wake || 0, elapsed, bp); break;
+      case 'bedfall':     kps = this.poseBedFall(person.fallProgress || 0, elapsed, bp); break;
       case 'standing':
       default:            kps = this.poseStanding(px, pz, elapsed, ms, bp); break;
     }
 
-    // AuraCare: older-adult posture (forward stoop, rounded shoulders, softer knees)
+    // WiCare: older-adult posture (forward stoop, rounded shoulders, softer knees)
     if (PoseSystem.frail && (pose === 'standing' || pose === 'walking' || pose === 'sitting')) {
       this.stoop(kps, pose === 'sitting' ? 0.5 : 1);
     }
@@ -54,7 +55,7 @@ export class PoseSystem {
     return kps;
   }
 
-  // ---- AuraCare: stoop (face points -z in these poses) ------------------
+  // ---- WiCare: stoop (face points -z in these poses) ------------------
 
   stoop(kps, k) {
     const shift = { 0: [-0.10, -0.07], 1: [-0.10, -0.07], 2: [-0.10, -0.07], 3: [-0.09, -0.07], 4: [-0.09, -0.07],
@@ -63,7 +64,7 @@ export class PoseSystem {
     for (const i in shift) { kps[i][2] += shift[i][0] * k; kps[i][1] += shift[i][1] * k; }
   }
 
-  // ---- AuraCare: getting out of bed --------------------------------------
+  // ---- WiCare: getting out of bed --------------------------------------
   // wake 0 = lying on the bed, 1 = sitting up in bed, 2 = sitting on the bed edge, 3 = standing beside it.
   // Fractions blend between neighbouring key poses. World coordinates (bed centre 3.5, -3.5; mattress top 0.53).
 
@@ -79,6 +80,23 @@ export class PoseSystem {
     const chest = bp * 0.012 * (1 - w / 3);
     for (const k of [5, 6, 11, 12]) out[k][1] += chest;
     return out;
+  }
+
+  /** WiCare room view: lying on the bed, rolls over the near edge (z + 0.45) and lands face down on the floor.
+   *  k: 0 = in bed, 1 = on the floor. Half a turn about the mattress edge while the edge drops to the floor. */
+  poseBedFall(k, elapsed, bp) {
+    const keys = PoseSystem._wakeKeys || (PoseSystem._wakeKeys = this._buildWakeKeys());
+    const e = k * k * (3 - 2 * k), th = Math.PI * e, c = Math.cos(th), s = Math.sin(th);
+    const ez = -3.5 + WAKE_BED.dz + 0.45, ey = 0.53;
+    const py = ey + (0.2 - ey) * e, pz = ez + 0.15 * e;
+    const flail = Math.sin(k * Math.PI) * 0.18, settle = k >= 1 ? 0 : 1;
+    return keys[0].map(([x, y, z], i) => {
+      const dy = y - ey, dz = z - ez;
+      const out = [x, py + dy * c - dz * s, pz + dy * s + dz * c];
+      if (i >= 7 && i <= 10) out[1] += flail * settle;                 // arms flail on the way down
+      if (k <= 0 && (i === 5 || i === 6 || i === 11 || i === 12)) out[1] += bp * 0.012;
+      return out;
+    });
   }
 
   _wakeStanding(elapsed, bp) {

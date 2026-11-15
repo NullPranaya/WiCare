@@ -1,11 +1,11 @@
 /**
- * AuraCare layer on RuView's observatory scene.
+ * WiCare layer on RuView's observatory scene.
  *
- * BACKEND source (preferred): polls AuraCare `GET /care/state` once a second. The care pill, the event strip,
+ * BACKEND source (preferred): polls WiCare `GET /care/state` once a second. The care pill, the event strip,
  *   the movement chart and the iMessage conversation all come from stored rows. The simulated RuView cards are
  *   hidden and the 3D view is labelled as a visualisation, so nothing on screen is invented.
  *   Backend URL: ?api=http://host:8000 (default: same host, port 8000).
- * LIVE source (RuView WebSocket, no AuraCare backend): reads `data.auracare`
+ * LIVE source (RuView WebSocket, no WiCare backend): reads `data.auracare`
  *   { status, label, title, step 0..4, since_utc }.
  * DEMO source (nothing reachable): plays an older-adult story on RuView's simulated data. Badge stays "DEMO".
  */
@@ -15,8 +15,12 @@ import { dotChart } from './aura-viz.js';
 // default story: waking up (bed, sit up at 5 s, get up at 11 s, walk at 15 s), everything OK.
 // ?scene=fall plays the older fall story instead.
 const SCENE = new URLSearchParams(location.search).get('scene');
-const STORY = SCENE === 'fall'
-  ? [{ scenario: 'elderly_care', dur: 26 }, { scenario: 'fall_event', dur: 34 }]
+// ?room=1: the WiCare room view. WiCare's dashboard sends the nurse here after they reply 1 to the fall alert
+// (wicare/fallguard/fallguard/room.py). Plays the wake-up story in a hospital room; no WiCare backend needed.
+const ROOM_VIEW = new URLSearchParams(location.search).has('room');
+const ROOM_VIEW_ = new URLSearchParams(location.search).has('room');
+const STORY = ROOM_VIEW_ ? [{ scenario: 'stand_fall', dur: 15 }]
+  : SCENE === 'fall' ? [{ scenario: 'elderly_care', dur: 26 }, { scenario: 'fall_event', dur: 34 }]
   : [{ scenario: 'wake_up', dur: 36 }];
 const IDLE_SCENE = SCENE === 'fall' ? 'elderly_care' : 'wake_up';
 // seconds after the fall pose appears (demo pacing only)
@@ -29,10 +33,10 @@ const POSE_WORDS = { walking: 'Walking around the living room', standing: 'Stand
                      lying: 'Lying down', falling: 'Sudden movement', fallen: 'On the floor, not moving' };
 const hhmm = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const hhmmss = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-const WHO = { 'out:patient': 'AuraCare to patient', 'out:caregiver': 'AuraCare to nurse',
+const WHO = { 'out:patient': 'WiCare to patient', 'out:caregiver': 'WiCare to nurse',
               'in:patient': 'Patient', 'in:caregiver': 'Nurse' };
 
-export class AuraCare {
+export class WiCare {
   constructor(obs) {
     this.obs = obs;
     PoseSystem.frail = true;            // slower gait, slight stoop (pose-system.js)
@@ -42,12 +46,25 @@ export class AuraCare {
     this.care = null; this._okAt = 0; this._scene = null; this._eventId = null; this._msgKey = '';
     // ?scene=fall starts the demo story at the fall (handy on stage)
     this.i = SCENE === 'fall' ? 0 : -1;
+    this._openedAt = new Date();
+    if (ROOM_VIEW) this._roomSetup();
     this._next();
     // ?t=<seconds> jumps into the story (rehearsal): e.g. ?t=14 starts just before the walk
     const t0 = parseFloat(new URLSearchParams(location.search).get('t'));
     if (t0 > 0) { this.t = t0; this.obs._demoData._elapsed = t0; }
-    this._poll();
+    if (!ROOM_VIEW) this._poll();
   }
+
+  _roomSetup() {
+    document.body.classList.add('aura-room');
+    const banner = document.createElement('div');
+    banner.id = 'aura-fall'; banner.hidden = true; banner.setAttribute('role', 'alert');
+    banner.textContent = 'FALL DETECTED';
+    document.body.appendChild(banner);
+    this._banner = banner;
+  }
+
+  _roomStatus() {}
 
   // set only by the poller, so the render loop and the poller can never disagree
   get backend() { return this._last.mode === true; }
@@ -82,6 +99,12 @@ export class AuraCare {
     if (source === 'ws') return this._live(data && data.auracare);
     this.t += dt;
     if (this.t > STORY[this.i].dur) return this._next();
+    if (ROOM_VIEW) {
+      const pose = data && data.persons && data.persons[0] && data.persons[0].pose;
+      const fp = data && data.persons && data.persons[0] && data.persons[0].fallProgress;
+      if (this._banner) this._banner.hidden = !((pose === 'bedfall' && fp > 0.3) || pose === 'falling' || pose === 'fallen');
+      return;
+    }
     const pose = data && data.persons && data.persons[0] && data.persons[0].pose;
     if (!this.ev && (pose === 'falling' || pose === 'fallen')) this.ev = { t0: this.t, at: new Date() };
     if (!this.ev) return this._render({ status: 'ok', label: SCENE === 'fall' ? 'Monitoring' : 'All good', step: 0 });
@@ -124,7 +147,8 @@ export class AuraCare {
     this.t = 0;
     this.ev = null;
     this._setScene(STORY[this.i].scenario);
-    this._render({ status: 'ok', label: SCENE === 'fall' ? 'Monitoring' : 'All good', step: 0 });
+    if (ROOM_VIEW) this._roomStatus();
+    else this._render({ status: 'ok', label: SCENE === 'fall' ? 'Monitoring' : 'All good', step: 0 });
   }
 
   _setScene(name) {
@@ -188,7 +212,7 @@ export class AuraCare {
     if (!msgs.length) {
       const p = document.createElement('div');
       p.className = 'aura-empty';
-      p.textContent = 'No active check-in. AuraCare texts only when a burst of movement is followed by stillness.';
+      p.textContent = 'No active check-in. WiCare texts only when a burst of movement is followed by stillness.';
       return body.appendChild(p);
     }
     for (const m of msgs) {

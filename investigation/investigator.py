@@ -84,7 +84,7 @@ def investigate(svc, event_id, expected_hz=2.0):
 
 def summary(ev, obs, c, health):
     if health['status'] != 'ok':
-        return f"Sensor {health['status']}; AuraCare can't tell what is happening right now. Please check the sensor."
+        return f"Sensor {health['status']}; WiCare can't tell what is happening right now. Please check the sensor."
     what = ev['event_type'].replace('_', ' ')
     s = f"{what.capitalize()} detected at {ev['start_utc'][11:19]} UTC ({ev['source']}). "
     if c: s += f"Check-in is {c['state'].replace('_', ' ')}. "

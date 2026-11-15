@@ -1,4 +1,4 @@
-"""The team's ESPectre burst-then-stillness rule (monitoring/burst_rule.py) and its wiring into AuraCare."""
+"""The team's ESPectre burst-then-stillness rule (monitoring/burst_rule.py) and its wiring into WiCare."""
 from monitoring.burst_rule import BurstDetector, BurstRule, Fusion
 from backend.config import Settings
 from backend.service import Service

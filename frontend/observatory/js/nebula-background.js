@@ -55,7 +55,7 @@ void main() {
   float n2 = fbm(dir * 4.0 - uTime * 0.005, max(1.0, uOctaves - 1.0));
 
   // Foundation palette: deep blue-black with warm undertones
-  vec3 deepBlack  = vec3(0.05, 0.07, 0.12);   // AuraCare: lifted
+  vec3 deepBlack  = vec3(0.05, 0.07, 0.12);   // WiCare: lifted
   vec3 warmNavy   = vec3(0.08, 0.12, 0.24);
   vec3 greenTint  = vec3(0.03, 0.14, 0.10);
 

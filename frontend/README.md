@@ -1,7 +1,7 @@
-# AuraCare front end (page 1: live room)
+# WiCare front end (page 1: live room)
 
 Based on RuView's Observatory UI (MIT, (c) 2024 rUv, see RUVIEW_LICENSE): same 3D scene,
-AuraCare branding, two small cards (Breathing, Room), a care status pill and an event strip.
+WiCare branding, two small cards (Breathing, Room), a care status pill and an event strip.
 
 ```bash
 cd frontend && python3 -m http.server 3000
@@ -10,7 +10,7 @@ cd frontend && python3 -m http.server 3000
 # open http://localhost:3000/?t=14      jump into the story (seconds), handy for rehearsal
 # open http://localhost:3000/?scene=fall the older story: calm activity, then a fall pattern
 ```
-- **With the AuraCare backend (main mode):** the page polls `GET /care/state` on port 8000 every second
+- **With the WiCare backend (main mode):** the page polls `GET /care/state` on port 8000 every second
   (`?api=http://host:8000` to point elsewhere). The care pill, the event strip (Detected, Check-in sent,
   Reply with countdown, Caregiver), a live movement-score chart with the alert thresholds, and the real
   iMessage conversation all come from the backend. RuView's simulated Breathing / Room cards are hidden and

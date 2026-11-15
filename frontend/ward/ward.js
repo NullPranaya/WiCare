@@ -1,7 +1,7 @@
 /**
- * AuraCare ward: 5 hospital bays in 3D, one stress monitor per room.
+ * WiCare ward: 5 hospital bays in 3D, one stress monitor per room.
  *
- * Data: polls GET /ward/state on the AuraCare backend (?api=http://host:8000, default same host :8000).
+ * Data: polls GET /ward/state on the WiCare backend (?api=http://host:8000, default same host :8000).
  *   The other rooms drift at calm levels (simulated). The live room (backend WARD_LIVE_ROOM, default 3) is set from
  *   /ward/control (a teammate's phone). Live room high for 3 s -> backend texts the nurse "check on them? 1 YES / 2 NO".
  * Privacy: the overview shows closed rooms only (roofs, walls, doors), and nobody is drawn inside. Only after the nurse
@@ -430,7 +430,7 @@ function renderChat(msgs) {
   for (const m of msgs) {
     const d = document.createElement('div'); d.className = `msg ${m.direction}`; d.textContent = m.text;
     const t = document.createElement('small');
-    t.textContent = `${m.direction === 'in' ? 'Nurse' : 'AuraCare'} · ${hhmmss(new Date(m.ts_utc))}${m.status === 'mock_sent' ? ' · mock' : ''}`;
+    t.textContent = `${m.direction === 'in' ? 'Nurse' : 'WiCare'} · ${hhmmss(new Date(m.ts_utc))}${m.status === 'mock_sent' ? ' · mock' : ''}`;
     d.appendChild(t); body.appendChild(d);
   }
   body.scrollTop = body.scrollHeight;

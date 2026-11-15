@@ -5,43 +5,43 @@ from backend.db import new_id, now, loads
 OPEN = ('pending', 'ambiguous')
 
 # ---- patient messages ----
-PROMPT = ("\U0001F499 AuraCare | Wellbeing Check\n\n"
+PROMPT = ("\U0001F499 WiCare | Wellbeing Check\n\n"
           "Hi! We noticed some unusual movement in your room and wanted to check on you.\n\n"
           "Are you okay?\n\n"
           "Reply 1: YES\nReply 2: NO")
-CLARIFY = ("\U0001F499 AuraCare\n\n"
+CLARIFY = ("\U0001F499 WiCare\n\n"
            "Sorry, we didn't quite catch that.\n\n"
            "Reply 1: YES, I'm okay\nReply 2: NO, I need help\n\n"
            "We've also let your nurse know so they can check in.")
 THANKS = {
-    'acknowledged':   "\U0001F499 AuraCare\n\nThank you! We're so glad you're okay. Your nurse has been updated. Take care!",
-    'help_requested': "\U0001F499 AuraCare\n\nWe've let your nurse know right away so they can check on you.",
-    'away':           "\U0001F499 AuraCare\n\nThanks for letting us know! Your nurse has been updated.",
+    'acknowledged':   "\U0001F499 WiCare\n\nThank you! We're so glad you're okay. Your nurse has been updated. Take care!",
+    'help_requested': "\U0001F499 WiCare\n\nWe've let your nurse know right away so they can check on you.",
+    'away':           "\U0001F499 WiCare\n\nThanks for letting us know! Your nurse has been updated.",
 }
 
 # ---- nurse messages (role 'caregiver' in code). The nurse hears about every check-in, whatever the reply ----
 NURSE = {
-    'notice':  ("\U0001FA7A AuraCare | Care Team Notice\n\n"
+    'notice':  ("\U0001FA7A WiCare | Care Team Notice\n\n"
                 "We noticed unusual movement in your patient's room and just sent them a wellbeing check.\n\n"
                 "No action needed yet. We'll update you as soon as they reply."),
-    'ok':      ("\U0001F49A AuraCare | Update\n\n"
+    'ok':      ("\U0001F49A WiCare | Update\n\n"
                 "Good news: your patient replied YES, they're okay.\n\n"
                 "No action needed."),
-    'help':    ("\U0001F6A8 AuraCare | Please Check In\n\n"
+    'help':    ("\U0001F6A8 WiCare | Please Check In\n\n"
                 "Your patient replied NO to the wellbeing check and may need help.\n\n"
                 "Please go check on them now."),
-    'help_text': ("\U0001F6A8 AuraCare | Please Check In\n\n"
+    'help_text': ("\U0001F6A8 WiCare | Please Check In\n\n"
                   "Your patient replied: \"{text}\"\n\n"
                   "They may need help. Please go check on them now."),
-    'timeout': ("\u23F0 AuraCare | No Reply\n\n"
+    'timeout': ("\u23F0 WiCare | No Reply\n\n"
                 "Your patient hasn't answered the wellbeing check yet.\n\n"
                 "Please check on them."),
-    'unclear': ("\U0001F4AC AuraCare | Unclear Reply\n\n"
+    'unclear': ("\U0001F4AC WiCare | Unclear Reply\n\n"
                 "Your patient replied: \"{text}\"\n\n"
                 "We've asked them again. You may want to check in."),
-    'away':    ("\U0001FA7A AuraCare | Update\n\n"
+    'away':    ("\U0001FA7A WiCare | Update\n\n"
                 "Your patient says they're away from the room right now."),
-    'undelivered': ("\u26A0\uFE0F AuraCare | Couldn't Reach Patient\n\n"
+    'undelivered': ("\u26A0\uFE0F WiCare | Couldn't Reach Patient\n\n"
                     "The wellbeing check couldn't be delivered to your patient.\n\n"
                     "Please check on them directly."),
 }
