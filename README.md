@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="wicare/fallguard/fallguard/static/icon-512.png" alt="WiCare logo: a heart with a Wi-Fi symbol" width="120">
+
 # WiCare
 
 ### Uses Wi-Fi waves to detect when a patient falls, without using a camera, and texts the nurse.
